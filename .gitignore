@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+
+BACnetSecureConnectExampleCPP/submodules/boost_1_78_0/*
+BACnetSecureConnectExampleCPP/.vs/BACnetSCExampleCPP/v17/
+BACnetSecureConnectExampleCPP/x64/Debug/
+NodeTestWSServer/node_modules/

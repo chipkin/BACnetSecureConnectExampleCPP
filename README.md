@@ -1,6 +1,6 @@
 # BACnet Secure Connect Example CPP
 
-A basic BACnet Secure Connect (BACnetCS) server example written in C++ using the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack).
+A basic [BACnet Secure Connect](https://www.bacnetinternational.org/page/secureconnect) (BACnetCS) server example written in C++ using the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack).
 
 ## Releases
 
@@ -19,4 +19,4 @@ The [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack) s
 
 ### Pre-Requisites
 
-- [boost v1.78.0](https://www.boost.org/users/history/version_1_78_0.html)
+- [boost v1.78.0](https://www.boost.org/users/history/version_1_78_0.html) how to install on [Windows with Visual studios](https://www.boost.org/doc/libs/1_65_0/more/getting_started/windows.html)
