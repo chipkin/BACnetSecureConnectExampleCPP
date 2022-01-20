@@ -2,6 +2,8 @@
 
 A basic [BACnet Secure Connect](https://www.bacnetinternational.org/page/secureconnect) (BACnetCS) server example written in C++ using the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack).
 
+If you are looking for a free open source java implmeation of BACnet/SC I suggest looking at the [BACnet/SC Reference Stack](https://sourceforge.net/projects/bacnet-sc-reference-stack/)
+
 ## Releases
 
 Build versions of this example can be downloaded from the releases page:
@@ -19,4 +21,9 @@ The [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack) s
 
 ### Pre-Requisites
 
-- [boost v1.78.0](https://www.boost.org/users/history/version_1_78_0.html) how to install on [Windows with Visual studios](https://www.boost.org/doc/libs/1_65_0/more/getting_started/windows.html)
+- [Boost v1.78.0](https://www.boost.org/users/history/version_1_78_0.html)
+  - Steps to set up Boost with [Visual Studios on Windows](https://stackoverflow.com/a/29567344).
+  - Project Settings => C/C++ => General: ```\submodules\boost_1_78_0```
+  - Project Settings => Linker => General: Include additional library directory ```\submodules\boost_1_78_0\stage\lib```
+- [OpenSSL](https://www.openssl.org/)
+  - [Building Boost with OpenSSL](https://stackoverflow.com/a/39888959)

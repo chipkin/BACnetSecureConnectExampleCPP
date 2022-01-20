@@ -79,68 +79,68 @@ public:
 
 
 // 
-// WSClient
+// WSClientUnsecure
 // ----------------------------------------------------------------------------
 
-WSClient::WSClient() {
+
+WSClientUnsecure::WSClientUnsecure() {
     this->m_ws = NULL;
 }
 
-bool WSClient::IsConnected() {
+bool WSClientUnsecure::IsConnected() {
     if (this->m_ws != NULL) {
         return this->m_ws->is_open();
     }
     return false;
 }
 
-bool WSClient::Connect(const WSURI uri) {
-    try {
-        if (this->m_ws != NULL) {
-            // We are connected, reconnect 
-            this->Disconnect();
-        }
-
-        // Extract the parts from the uri 
-        Uri uriSplit = Uri::Parse(uri);
-
-        // These objects perform our I/O
-        tcp::resolver resolver{ ioc };
-        this->m_ws = new websocket::stream<tcp::socket>(ioc);
-
-        // Look up the domain name
-        auto const results = resolver.resolve(uriSplit.Host, uriSplit.Port);
-
-        // Make the connection on the IP address we get from a lookup
-        auto ep = net::connect(m_ws->next_layer(), results);
-
-        // Update the host_ string. This will provide the value of the
-        // Host HTTP header during the WebSocket handshake.
-        // See https://tools.ietf.org/html/rfc7230#section-5.4
-        std::string hostStr = uriSplit.Host;
-        hostStr += ':' + std::to_string(ep.port());
-
-        // Set a decorator to change the User-Agent of the handshake
-        m_ws->set_option(websocket::stream_base::decorator(
-            [](websocket::request_type& req)
-            {
-                req.set(http::field::user_agent,
-                    std::string(BOOST_BEAST_VERSION_STRING) +
-                    " websocket-client-coro");
-            }));
-
-        // Perform the websocket handshake
-        m_ws->handshake(hostStr, uriSplit.Path);
-
-        // Check to see if the web socket is connected.
-        return m_ws->is_open();
-    }
-    catch (std::exception const& e) {
+bool WSClientUnsecure::Connect(const WSURI uri) {
+ 
+    if (this->m_ws != NULL) {
+        // We are connected, reconnect 
         this->Disconnect();
-        return false;
     }
+
+    // Extract the parts from the uri 
+    Uri uriSplit = Uri::Parse(uri);
+    if (uriSplit.Port.size() <= 0) {
+        uriSplit.Port = WEB_SOCKET_DEFAULT_PORT_NOT_SECURE; // Default port 80
+    }
+
+    // These objects perform our I/O
+    tcp::resolver resolver{ ioc };
+    this->m_ws = new websocket::stream<tcp::socket>(ioc);
+
+    // Look up the domain name
+    auto const results = resolver.resolve(uriSplit.Host, uriSplit.Port);
+
+    // Make the connection on the IP address we get from a lookup
+    auto ep = net::connect(m_ws->next_layer(), results);
+
+    // Update the host_ string. This will provide the value of the
+    // Host HTTP header during the WebSocket handshake.
+    // See https://tools.ietf.org/html/rfc7230#section-5.4
+    std::string hostStr = uriSplit.Host;
+    hostStr += ':' + std::to_string(ep.port());
+        
+    // Set a decorator to change the User-Agent of the handshake
+    m_ws->set_option(websocket::stream_base::decorator(
+        [](websocket::request_type& req)
+        {
+            req.set(http::field::user_agent,
+                std::string(BOOST_BEAST_VERSION_STRING) +
+                " websocket-client-coro");
+        }));
+
+    // Perform the websocket handshake
+    m_ws->handshake(hostStr, uriSplit.Path + uriSplit.QueryString);
+
+    // Check to see if the web socket is connected.
+    return m_ws->is_open();
+
 
 }
-void WSClient::Disconnect() {
+void WSClientUnsecure::Disconnect() {
     if (this->m_ws == NULL) {
         return;
     }
@@ -153,7 +153,7 @@ void WSClient::Disconnect() {
     this->m_ws = NULL;
 }
 
-size_t WSClient::SendWSMessage(const uint8_t* message, const uint16_t messageLength) {
+size_t WSClientUnsecure::SendWSMessage(const uint8_t* message, const uint16_t messageLength) {
     if (this->m_ws == NULL) {
         return 0; // Not connected 
     }
@@ -164,11 +164,12 @@ size_t WSClient::SendWSMessage(const uint8_t* message, const uint16_t messageLen
     }
     catch (std::exception const& e) {
         this->Disconnect();
+        std::cout << e.what() << std::endl;
         return 0;
     }
 }
 
-size_t WSClient::RecvWSMessage(uint8_t* message, uint16_t maxMessageLength) {
+size_t WSClientUnsecure::RecvWSMessage(uint8_t* message, uint16_t maxMessageLength) {
     if (this->m_ws == NULL) {
         return 0; // Not connected 
     }
@@ -188,9 +189,81 @@ size_t WSClient::RecvWSMessage(uint8_t* message, uint16_t maxMessageLength) {
     }
     catch (std::exception const& e) {
         this->Disconnect();
+        std::cout << e.what() << std::endl;
     }
     return 0;
 }
+
+
+
+// 
+// WSClientSecure
+// ----------------------------------------------------------------------------
+/*
+void load_root_certificates(ssl::context& ctx, boost::system::error_code& ec)
+{
+    // https://github.com/boostorg/beast/blob/develop/example/common/root_certificates.hpp
+    std::string cert = "d";
+}
+
+void load_root_certificates(ssl::context& ctx, boost::system::error_code& ec)
+{
+    load_root_certificates(ctx, ec);
+}
+
+void load_root_certificates(ssl::context& ctx)
+{
+    boost::system::error_code ec;
+    load_root_certificates(ctx, ec);
+    if (ec) {
+        throw boost::system::system_error{ ec };
+    }
+}
+*/
+
+
+WSClientSecure::WSClientSecure() {
+    // ToDo: 
+}
+
+bool WSClientSecure::IsConnected() {
+    // ToDo: 
+    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+    return false;
+}
+
+bool WSClientSecure::Connect(const WSURI uri) {
+    // ToDo: 
+    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+    return false; 
+
+}
+void WSClientSecure::Disconnect() {
+    if (! this->IsConnected()) {
+        return;
+    }
+    // ToDo: 
+    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+}
+
+size_t WSClientSecure::SendWSMessage(const uint8_t* message, const uint16_t messageLength) {
+    if (! this->IsConnected() ) {
+        return 0; // Not connected 
+    }
+    // ToDo: 
+    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+    return 0; 
+}
+
+size_t WSClientSecure::RecvWSMessage(uint8_t* message, uint16_t maxMessageLength) {
+    if (!this->IsConnected()) {
+        return 0; // Not connected 
+    }
+    // ToDo: 
+    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+    return 0; 
+}
+
 
 
 // 
@@ -198,41 +271,71 @@ size_t WSClient::RecvWSMessage(uint8_t* message, uint16_t maxMessageLength) {
 // ----------------------------------------------------------------------------
 
 // Check to see if this connection exists
-WSClient* WSNetworkLayer::GetWSClient(const WSURI uri) {
+WSClientBase* WSNetworkLayer::GetWSClient(const WSURI uri) {
     if (clients.count(uri) <= 0) {
         return NULL;
     }
     else {
-        return &this->clients[uri];
+        return this->clients[uri];
     }
+}
+
+bool WSNetworkLayer::IsConnected(const WSURI uri) {
+    // Check to see if this connection exists
+    WSClientBase* ws = GetWSClient(uri);
+    if (ws == NULL) {
+        return false;
+    }
+
+    return ws->IsConnected();
 }
 
 
 bool WSNetworkLayer::AddConnection(const WSURI uri) {
     // Check to see if this connection exists
-    WSClient* ws = GetWSClient(uri);
+    WSClientBase* ws = GetWSClient(uri);
     if (ws != NULL) {
         return true;
     }
 
     // Add a new connection. 
-    return this->clients[uri].Connect(uri);
+    // -------------------------
+
+    // Extract the parts from the uri 
+    Uri uriSplit = Uri::Parse(uri);
+    if (uriSplit.Protocol.compare("ws") == 0) {
+        this->clients[uri] = new WSClientUnsecure(); 
+        return this->clients[uri]->Connect(uri);
+    }
+    else if (uriSplit.Protocol.compare("wss") == 0) {
+        std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+        this->clients[uri] = new WSClientSecure();
+        return this->clients[uri]->Connect(uri);
+    }
+
+    // Unknown 
+    std::cout << "Error: Unknown protocol. Protocol=[" << uriSplit.Protocol  << "]" << std::endl;
+    return false;
 }
 void WSNetworkLayer::RemoveConnection(const WSURI uri) {
     // Check to see if this connection exists
-    WSClient* ws = GetWSClient(uri);
+    WSClientBase* ws = GetWSClient(uri);
 
     // Disconnect 
     if (ws != NULL) {
         ws->Disconnect();
     }
 
+    // Safe Delete 
+    delete this->clients[uri];
+    this->clients[uri] = NULL;
+
     // Remove from client list. 
     this->clients.erase(uri);
 }
 size_t WSNetworkLayer::SendWSMessage(const WSURI uri, const uint8_t* message, const uint16_t messageLength) {
     // Check to see if this connection exists
-    WSClient* ws = GetWSClient(uri);
+    WSClientBase* ws = GetWSClient(uri);
     if (ws == NULL) {
         // Error this connection does not exist. Do not automaticly add it. 
         return 0;
@@ -244,7 +347,7 @@ size_t WSNetworkLayer::SendWSMessage(const WSURI uri, const uint8_t* message, co
 
 size_t WSNetworkLayer::RecvWSMessage(const WSURI uri, uint8_t* message, const uint16_t maxMessageLength) {
     // Check to see if this connection exists
-    WSClient* ws = GetWSClient(uri);
+    WSClientBase* ws = GetWSClient(uri);
     if (ws == NULL) {
         // Error this connection does not exist. Do not automaticly add it. 
         return 0;

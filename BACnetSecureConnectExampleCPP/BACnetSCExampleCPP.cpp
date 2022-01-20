@@ -9,20 +9,22 @@
 int main(int argc, char** argv)
 {
     try {
-        WSClient wsc;
-        if (wsc.Connect("ws://localhost:8080/")) {
-            printf("Connected\n");
+        // WSURI uri = "wss://connect.websocket.in:443/v3/1?api_key=oCdCMcMPQpbvNjUIzqtvF1d2X2okWpDQj4AwARJuAgtjhzKxVEjQU6IdCjwm&notify_self"; 
+        WSURI uri = "ws://localhost:8080/";
+        WSNetworkLayer network;
+        if (network.AddConnection(uri)) {
+            std::cout << "Connected to uri=[" << uri << "]" << std::endl ;
 
             std::string sentMessage = "testing";
-            if (wsc.SendWSMessage((uint8_t*)sentMessage.c_str(), sentMessage.size()) > 0) {
-                std::cout << "FYI: Message sent" << std::endl ;
+            if (network.SendWSMessage(uri, (uint8_t*)sentMessage.c_str(), sentMessage.size()) > 0) {
+                std::cout << "FYI: Message sent. Message=[" << sentMessage << "]" << std::endl;
 
                 // This buffer will hold the incoming message
                 uint8_t recvMessage[1024];                
 
                 // Loop while connected 
-                while ( wsc.IsConnected() ) {
-                    size_t len = wsc.RecvWSMessage(recvMessage, 1024);
+                while (network.IsConnected(uri) ) {
+                    size_t len = network.RecvWSMessage(uri, recvMessage, 1024);
                     if (len > 0) {
                         recvMessage[len] = 0;
                         std::cout << recvMessage; //  << std::endl;
@@ -34,7 +36,7 @@ int main(int argc, char** argv)
             }
 
             std::cout << "FYI: Disconnect" << std::endl;
-            wsc.Disconnect();
+            network.RemoveConnection(uri);
         } 
         else {
             std::cout << "Error: Could not connect" << std::endl;
