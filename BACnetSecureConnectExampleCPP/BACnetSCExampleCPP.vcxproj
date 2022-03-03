@@ -120,13 +120,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)submodules\boost_1_78_0;C:\Program Files\OpenSSL\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)submodules\boost_1_78_0;$(SolutionDir)submodules\openssl\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)submodules\boost_1_78_0\bin\x64\lib;C:\Program Files\OpenSSL\lib\engines-1_1;C:\Program Files\OpenSSL\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>C:\Program Files\OpenSSL\lib\libcrypto.lib;C:\Program Files\OpenSSL\lib\libssl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)submodules\boost_1_78_0\bin\x64\lib;$(SolutionDir)submodules\openssl\lib\engines-1_1;$(SolutionDir)submodules\openssl\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>$(SolutionDir)submodules\openssl\lib\libcrypto.lib;$(SolutionDir)submodules\openssl\lib\libssl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

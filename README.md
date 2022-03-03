@@ -34,14 +34,14 @@ The [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack) s
 ### Pre-Requisites
 
 - [Boost v1.78.0](https://www.boost.org/users/history/version_1_78_0.html)
-  - Steps to set up Boost with [Visual Studios on Windows](https://stackoverflow.com/a/29567344) (Place boost library in `REPO\BACnetSecureConnectExampleCPP\submodules` instead)
+  - Steps to set up Boost with [Visual Studios on Windows](https://stackoverflow.com/a/29567344) (Place boost library in `\BACnetSecureConnectExampleCPP\submodules`, or update linking paths)
   - Double check the following project properties:
     - Project Settings => C/C++ => General:  
-   `\submodules\boost_1_78_0`
+   `\YOUR_BOOST_1_78_0_INSTALLATION`
     - Project Settings => Linker => General: Include additional library directory   
-  `\submodules\boost_1_78_0\stage\lib`, or wherever the built `libs` are located (i.e. `\submodules\boost_1_78_0\x64\lib`)
+  `\YOUR_BOOST_1_78_0_INSTALLATION\stage\lib`, or wherever the built `libs` are located (i.e. `\YOUR_BOOST_1_78_0_INSTALLATION\x64\lib`)
 - [OpenSSL v1.1.1](https://www.openssl.org/)
-  - Steps to [build OpenSSL on Windows](https://github.com/openssl/openssl/blob/master/NOTES-WINDOWS.md)
+  - Steps to [build OpenSSL on Windows](https://github.com/openssl/openssl/blob/master/NOTES-WINDOWS.md) (Build to `\BACnetSecureConnectExampleCPP\submodules`, or update linking paths)
   - Double check the following project properties:
     - Project Settings => C/C++ => General:   
   `\YOUR_OPENSSL_INSTALLATION\include`
