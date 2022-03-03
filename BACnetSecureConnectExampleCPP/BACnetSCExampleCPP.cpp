@@ -3,20 +3,22 @@
 #include "WSClient.h"
 #include <string>
 #include <boost/beast/core.hpp>
+#include <boost/asio/ssl.hpp>
 
 
 // Sends a WebSocket message and prints the response
 int main(int argc, char** argv)
 {
     try {
-        // WSURI uri = "wss://connect.websocket.in:443/v3/1?api_key=oCdCMcMPQpbvNjUIzqtvF1d2X2okWpDQj4AwARJuAgtjhzKxVEjQU6IdCjwm&notify_self"; 
-        WSURI uri = "ws://localhost:8080/";
+        WSURI uri = "wss://localhost:8443/"; 
+        //WSURI uri = "ws://localhost:8080/";
         WSNetworkLayer network;
         if (network.AddConnection(uri)) {
             std::cout << "Connected to uri=[" << uri << "]" << std::endl ;
 
             std::string sentMessage = "testing";
             if (network.SendWSMessage(uri, (uint8_t*)sentMessage.c_str(), sentMessage.size()) > 0) {
+            //if (true) {
                 std::cout << "FYI: Message sent. Message=[" << sentMessage << "]" << std::endl;
 
                 // This buffer will hold the incoming message

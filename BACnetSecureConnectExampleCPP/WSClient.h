@@ -5,12 +5,15 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-/*
-// SSL 
-#include <boost/beast/ssl.hpp>
+
+// SSL
 #include <boost/beast/websocket/ssl.hpp>
+#include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/stream.hpp>
-*/
+
+
+#include <boost/bind.hpp>
+
 
 #include <cstdlib>
 #include <iostream>
@@ -20,8 +23,9 @@ namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
 namespace net = boost::asio;            // from <boost/asio.hpp>
+namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
-// namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
+
 
 #include <map>
 #include <string>
@@ -48,7 +52,7 @@ public:
     virtual size_t RecvWSMessage(uint8_t* message, const uint16_t maxMessageLength) = 0;
 };
 
-//
+// 
 // WSClient
 // ----------------------------------------------------------------------------
 // Based off of https://github.com/boostorg/beast/tree/develop/example/websocket/client/sync 
@@ -80,7 +84,10 @@ private:
     // The io_context is required for all I/O
     net::io_context ioc;
 
-    // websocket::stream<tcp::socket>* m_wss;
+    // The SSL Context for configuring SSL options
+    ssl::context* ctx;
+
+    ssl::stream<tcp::socket>* m_wss;
 
 public:
 
