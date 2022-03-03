@@ -1,4 +1,5 @@
 #include "WSClient.h"
+#include <boost/asio/ssl/host_name_verification.hpp>    // Explicit include - don't know why Visual Studio does not detect this
 
 
 // 
@@ -95,7 +96,7 @@ bool WSClientUnsecure::IsConnected() {
 }
 
 bool WSClientUnsecure::Connect(const WSURI uri) {
- 
+
     if (this->m_ws != NULL) {
         // We are connected, reconnect 
         this->Disconnect();
@@ -199,59 +200,78 @@ size_t WSClientUnsecure::RecvWSMessage(uint8_t* message, uint16_t maxMessageLeng
 // 
 // WSClientSecure
 // ----------------------------------------------------------------------------
-/*
-void load_root_certificates(ssl::context& ctx, boost::system::error_code& ec)
-{
-    // https://github.com/boostorg/beast/blob/develop/example/common/root_certificates.hpp
-    std::string cert = "d";
-}
 
-void load_root_certificates(ssl::context& ctx, boost::system::error_code& ec)
-{
-    load_root_certificates(ctx, ec);
-}
-
-void load_root_certificates(ssl::context& ctx)
-{
-    boost::system::error_code ec;
-    load_root_certificates(ctx, ec);
-    if (ec) {
-        throw boost::system::system_error{ ec };
-    }
-}
-*/
-
+// Attempting this: https://www.boost.org/doc/libs/1_66_0/doc/html/boost_asio/overview/ssl.html
 
 WSClientSecure::WSClientSecure() {
     // ToDo: 
+    this->m_wss = NULL;
+    this->ctx = NULL;
 }
 
 bool WSClientSecure::IsConnected() {
-    // ToDo: 
-    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+    // No is_open function for ssl::stream
+    if (this->m_wss != NULL) {
+        return true;
+    }
     return false;
 }
 
 bool WSClientSecure::Connect(const WSURI uri) {
-    // ToDo: 
-    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
-    return false; 
+    // Parse Uri
+    Uri parsedUri = Uri::Parse(uri);
 
+    // Setup SSL context and load certificate
+    this->ctx = new ssl::context(ssl::context::sslv23);
+    this->ctx->load_verify_file("./cert.pem");  // NOTE: Use the same certificate as your server here (verify_mode: ssl::verify_peer)
+
+    // Open socket and connect to remote host
+    this->m_wss = new ssl::stream<tcp::socket>(this->ioc, *this->ctx);
+    tcp::resolver resolver{ this->ioc };
+    auto result = resolver.resolve({ parsedUri.Host, parsedUri.Port });
+    try {
+        net::connect(this->m_wss->next_layer(), result.begin(), result.end());
+        this->m_wss->lowest_layer().set_option(tcp::no_delay(true));
+    }
+    catch (std::exception const& e) {
+        std::cout << e.what() << std::endl;
+        return false;
+    }
+
+    // Perform SSL handshake and verify remote host's certificate
+    this->m_wss->set_verify_mode(ssl::verify_peer);
+    this->m_wss->handshake(ssl::stream<tcp::socket>::client);
+
+    return true; 
 }
 void WSClientSecure::Disconnect() {
     if (! this->IsConnected()) {
         return;
     }
-    // ToDo: 
-    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+    
+    // Shutdown the WebSocket connection
+    this->m_wss->shutdown();
+
+    // Remove the socket
+    delete this->m_wss;
+    this->m_wss = NULL;
 }
 
 size_t WSClientSecure::SendWSMessage(const uint8_t* message, const uint16_t messageLength) {
     if (! this->IsConnected() ) {
         return 0; // Not connected 
     }
-    // ToDo: 
-    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+
+    try {
+        // Send the message
+        return this->m_wss->write_some(net::buffer(message, messageLength));
+    }
+    catch (std::exception const& e) {
+        this->Disconnect();
+        std::cout << e.what() << std::endl;
+        return 0;
+    }
+
     return 0; 
 }
 
@@ -259,8 +279,18 @@ size_t WSClientSecure::RecvWSMessage(uint8_t* message, uint16_t maxMessageLength
     if (!this->IsConnected()) {
         return 0; // Not connected 
     }
-    // ToDo: 
-    std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
+
+    try {
+        // Create buffer using message pointer directly
+        net::mutable_buffer buffer(message, maxMessageLength);
+
+        // Read a message into our message buffer
+        return this->m_wss->read_some(buffer);
+    }
+    catch (std::exception const& e) {
+        this->Disconnect();
+        std::cout << e.what() << std::endl;
+    }
     return 0; 
 }
 
@@ -308,7 +338,6 @@ bool WSNetworkLayer::AddConnection(const WSURI uri) {
         return this->clients[uri]->Connect(uri);
     }
     else if (uriSplit.Protocol.compare("wss") == 0) {
-        std::cout << "ToDo: Secure web sockets is not supported yet." << std::endl;
         this->clients[uri] = new WSClientSecure();
         return this->clients[uri]->Connect(uri);
     }

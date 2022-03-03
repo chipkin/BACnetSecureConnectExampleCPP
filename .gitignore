@@ -31,12 +31,15 @@
 *.out
 *.app
 
+# SSL Certificates and Keys
+*.pem
+
 
 BACnetSecureConnectExampleCPP/submodules/boost_1_78_0/*
 BACnetSecureConnectExampleCPP/.vs/BACnetSCExampleCPP/v17/
 BACnetSecureConnectExampleCPP/x64/Debug/
 NodeTestWSServer/node_modules/
-
+NodeTestWSSecureServer/node_modules/
 BACnetSecureConnectExampleCPP/submodules/
-
 BACnetSecureConnectExampleCPP/.vs/BACnetSCExampleCPP/project-colors.json
+.vscode/
