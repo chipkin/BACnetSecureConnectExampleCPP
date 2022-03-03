@@ -12,14 +12,18 @@ Build versions of this example can be downloaded from the releases page:
 ## Testing
 
 A WebSockets test server node application is included in this repo.   
-- `/NodeTestWSServer/` for unsecure websockets,
--  `/NodeTestWSSecureServer/` for websockets with SSL    
+- `\NodeTestWSServer\` for unsecure websockets,
+-  `\NodeTestWSSecureServer\` for websockets with SSL    
 
 Install and run:  
 ```
 npm install
 npm run run
 ```
+
+NOTE:  
+To run the secure connection example, you have to generate your own certiifcate and private key pair, named `cert.pem` and `key.pem` and placed in `\BACnetSecureConnectExampleCPP\` and `\NodeTestWSSecureServer\`.   
+You must also update `\NodeTestWSSecureServer\app.js:5-7` accordingly.
 
 ## Build
 
@@ -30,7 +34,7 @@ The [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack) s
 ### Pre-Requisites
 
 - [Boost v1.78.0](https://www.boost.org/users/history/version_1_78_0.html)
-  - Steps to set up Boost with [Visual Studios on Windows](https://stackoverflow.com/a/29567344) (Place boost library in `REPO/BACnetSecureConnectExampleCPP/submodules` instead)
+  - Steps to set up Boost with [Visual Studios on Windows](https://stackoverflow.com/a/29567344) (Place boost library in `REPO\BACnetSecureConnectExampleCPP\submodules` instead)
   - Double check the following project properties:
     - Project Settings => C/C++ => General:  
    `\submodules\boost_1_78_0`
