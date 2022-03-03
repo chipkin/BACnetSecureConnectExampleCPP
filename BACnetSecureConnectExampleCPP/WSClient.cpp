@@ -96,7 +96,7 @@ bool WSClientUnsecure::IsConnected() {
 }
 
 bool WSClientUnsecure::Connect(const WSURI uri) {
- 
+
     if (this->m_ws != NULL) {
         // We are connected, reconnect 
         this->Disconnect();

@@ -18,7 +18,6 @@ int main(int argc, char** argv)
 
             std::string sentMessage = "testing";
             if (network.SendWSMessage(uri, (uint8_t*)sentMessage.c_str(), sentMessage.size()) > 0) {
-            //if (true) {
                 std::cout << "FYI: Message sent. Message=[" << sentMessage << "]" << std::endl;
 
                 // This buffer will hold the incoming message
