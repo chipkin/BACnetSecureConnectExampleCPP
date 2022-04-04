@@ -171,23 +171,22 @@ int main(int argc, char **argv) {
     std::cout << "OK" << std::endl;
 
     // NetworkPort (NP)
-	std::cout << "Added NetworkPort. networkPort.instance=[" << g_database.networkPort.instance << "]... ";
-	if (!fpAddNetworkPortObject(g_database.device.instance, g_database.networkPort.instance, CASBACnetStackExampleConstants::NETWORK_TYPE_IPV4, CASBACnetStackExampleConstants::PROTOCOL_LEVEL_BACNET_APPLICATION, CASBACnetStackExampleConstants::NETWORK_PORT_LOWEST_PROTOCOL_LAYER)) {
-		std::cerr << "Failed to add NetworkPort" << std::endl;
-		return -1;
-	}
-	fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_ACCEPT_FD_REGISTRATIONS, true);
-	fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_BROADCAST_DISTRIBUTION_TABLE, true);
-	fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_FOREIGN_DEVICE_TABLE, true);
+    std::cout << "Added NetworkPort. networkPort.instance=[" << g_database.networkPort.instance << "]... ";
+    if (!fpAddNetworkPortObject(g_database.device.instance, g_database.networkPort.instance, CASBACnetStackExampleConstants::NETWORK_TYPE_IPV4, CASBACnetStackExampleConstants::PROTOCOL_LEVEL_BACNET_APPLICATION, CASBACnetStackExampleConstants::NETWORK_PORT_LOWEST_PROTOCOL_LAYER)) {
+        std::cerr << "Failed to add NetworkPort" << std::endl;
+        return -1;
+    }
+    fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_ACCEPT_FD_REGISTRATIONS, true);
+    fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_BROADCAST_DISTRIBUTION_TABLE, true);
+    fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_FOREIGN_DEVICE_TABLE, true);
 
-	uint8_t ipPortConcat[6];
-	memcpy(ipPortConcat, g_database.networkPort.IPAddress, 4);
-	ipPortConcat[4] = g_database.networkPort.BACnetIPUDPPort / 256;
-	ipPortConcat[5] = g_database.networkPort.BACnetIPUDPPort % 256;
-	fpAddBDTEntry(ipPortConcat, 6, g_database.networkPort.IPSubnetMask, 4);		// First BDT Entry must be server device
+    uint8_t ipPortConcat[6];
+    memcpy(ipPortConcat, g_database.networkPort.IPAddress, 4);
+    ipPortConcat[4] = g_database.networkPort.BACnetIPUDPPort / 256;
+    ipPortConcat[5] = g_database.networkPort.BACnetIPUDPPort % 256;
+    fpAddBDTEntry(ipPortConcat, 6, g_database.networkPort.IPSubnetMask, 4); // First BDT Entry must be server device
 
-
-	std::cout << "OK" << std::endl;
+    std::cout << "OK" << std::endl;
 
     // Start the main loop
     // ---------------------------------------------------------------------------
@@ -227,51 +226,51 @@ uint16_t CallbackReceiveMessage(uint8_t *message, const uint16_t maxMessageLengt
     // TODO: Implement SC Receive Message
     int bytesRead = ws_network.RecvWSMessage()
 
-    // OLD:
-    // char ipAddress[32];
-    // uint16_t port = 0;
+                    // OLD:
+                    // char ipAddress[32];
+                    // uint16_t port = 0;
 
-    // // Attempt to read bytes
-    // int bytesRead = g_udp.GetMessage(message, maxMessageLength, ipAddress, &port);
-    // if (bytesRead > 0) {
-    //     ChipkinCommon::CEndianness::ToBigEndian(&port, sizeof(uint16_t));
-    //     std::cout << std::endl
-    //               << "FYI: Received message from [" << ipAddress << ":" << port << "], length [" << bytesRead << "]" << std::endl;
+                    // // Attempt to read bytes
+                    // int bytesRead = g_udp.GetMessage(message, maxMessageLength, ipAddress, &port);
+                    // if (bytesRead > 0) {
+                    //     ChipkinCommon::CEndianness::ToBigEndian(&port, sizeof(uint16_t));
+                    //     std::cout << std::endl
+                    //               << "FYI: Received message from [" << ipAddress << ":" << port << "], length [" << bytesRead << "]" << std::endl;
 
-    //     // Convert the IP Address to the connection string
-    //     if (!ChipkinCommon::ChipkinConvert::IPAddressToBytes(ipAddress, receivedConnectionString, maxConnectionStringLength)) {
-    //         std::cerr << "Failed to convert the ip address into a connectionString" << std::endl;
-    //         return 0;
-    //     }
-    //     receivedConnectionString[4] = port / 256;
-    //     receivedConnectionString[5] = port % 256;
+                    //     // Convert the IP Address to the connection string
+                    //     if (!ChipkinCommon::ChipkinConvert::IPAddressToBytes(ipAddress, receivedConnectionString, maxConnectionStringLength)) {
+                    //         std::cerr << "Failed to convert the ip address into a connectionString" << std::endl;
+                    //         return 0;
+                    //     }
+                    //     receivedConnectionString[4] = port / 256;
+                    //     receivedConnectionString[5] = port % 256;
 
-    //     *receivedConnectionStringLength = 6;
-    //     *networkType = CASBACnetStackExampleConstants::NETWORK_TYPE_IP;
+                    //     *receivedConnectionStringLength = 6;
+                    //     *networkType = CASBACnetStackExampleConstants::NETWORK_TYPE_IP;
 
-    //     /*
-    //     // Process the message as XML
-    //     static char xmlRenderBuffer[MAX_RENDER_BUFFER_LENGTH ];
-    //     if (fpDecodeAsXML((char*)message, bytesRead, xmlRenderBuffer, MAX_RENDER_BUFFER_LENGTH ) > 0) {
-    //         std::cout << "---------------------" << std::endl;
-    //         std::cout << xmlRenderBuffer << std::endl;
-    //         std::cout << "---------------------" << std::endl;
-    //         memset(xmlRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH );
-    //     }
-    //     */
+                    //     /*
+                    //     // Process the message as XML
+                    //     static char xmlRenderBuffer[MAX_RENDER_BUFFER_LENGTH ];
+                    //     if (fpDecodeAsXML((char*)message, bytesRead, xmlRenderBuffer, MAX_RENDER_BUFFER_LENGTH ) > 0) {
+                    //         std::cout << "---------------------" << std::endl;
+                    //         std::cout << xmlRenderBuffer << std::endl;
+                    //         std::cout << "---------------------" << std::endl;
+                    //         memset(xmlRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH );
+                    //     }
+                    //     */
 
-    //     // Process the message as JSON
-    //     static char jsonRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
-    //     if (fpDecodeAsJSON((char *)message, bytesRead, jsonRenderBuffer, MAX_RENDER_BUFFER_LENGTH) > 0) {
-    //         std::cout << "---------------------" << std::endl;
-    //         std::cout << jsonRenderBuffer << std::endl;
-    //         std::cout << "---------------------" << std::endl;
-    //         memset(jsonRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
-    //     }
-    // }
-    //
-    // return bytesRead;
-    return 0;
+                    //     // Process the message as JSON
+                    //     static char jsonRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
+                    //     if (fpDecodeAsJSON((char *)message, bytesRead, jsonRenderBuffer, MAX_RENDER_BUFFER_LENGTH) > 0) {
+                    //         std::cout << "---------------------" << std::endl;
+                    //         std::cout << jsonRenderBuffer << std::endl;
+                    //         std::cout << "---------------------" << std::endl;
+                    //         memset(jsonRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
+                    //     }
+                    // }
+                    //
+                    // return bytesRead;
+                    return 0;
 }
 
 // Callback used by the BACnet Stack to send a BACnet message
@@ -345,6 +344,17 @@ uint16_t CallbackSendMessage(const uint8_t *message, const uint16_t messageLengt
 
 // System callback Functions
 // ---------------------------------------------------------------------------
+// Callback used by the BACnet Stack to get the current time
+time_t CallbackGetSystemTime() {
+    return time(0) - g_database.device.currentTimeOffset;
+}
+
+void CallbackLogDebugMessage(const char *message, const uint16_t messageLength, const uint8_t messageType) {
+    // This callback is called when the CAS BACnet Stack logs an error or info message
+    // In this callback, you will be able to access this debug message. This callback is optional.
+    std::cout << std::string(message, messageLength) << std::endl;
+    return;
+}
 
 // Get Property callback functions
 // ---------------------------------------------------------------------------
