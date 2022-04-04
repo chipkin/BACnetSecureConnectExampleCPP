@@ -5,7 +5,6 @@
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-
 // SSL
 #include <boost/beast/websocket/ssl.hpp>
 #include <boost/asio/ssl/context.hpp>
