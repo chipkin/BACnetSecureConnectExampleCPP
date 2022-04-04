@@ -118,7 +118,8 @@ int main(int argc, char **argv) {
     if (IS_WSS) {
         uri += "wss://";
     } else {
-        uri += "ws://";
+        // TODO: Error code: WEBSOCKET_SCHEME_NOT_SUPPORTED
+        return false;
     }
     uri += WS_ADDRESS + ":" + std::to_string(WS_PORT) + "/";
 
@@ -407,7 +408,8 @@ bool CallbackGetPropertyReal(uint32_t deviceInstance, uint16_t objectType, uint3
 //         std::cout << "Connected to uri=[" << uri << "]" << std::endl;
 
 //         std::string sentMessage = "testing";
-//         if (network.SendWSMessage(uri, (uint8_t *)sentMessage.c_str(), sentMessage.size()) > 0) {
+//         uint8_t errorCode;
+//         if (network.SendWSMessage(uri, (uint8_t *)sentMessage.c_str(), sentMessage.size(), &errorCode) > 0) {
 //             std::cout << "FYI: Message sent. Message=[" << sentMessage << "]" << std::endl;
 
 //             // This buffer will hold the incoming message
@@ -415,14 +417,17 @@ bool CallbackGetPropertyReal(uint32_t deviceInstance, uint16_t objectType, uint3
 
 //             // Loop while connected
 //             while (network.IsConnected(uri)) {
-//                 size_t len = network.RecvWSMessage(uri, recvMessage, 1024);
+//                 size_t len = network.RecvWSMessage(uri, recvMessage, 1024, &errorCode);
 //                 if (len > 0) {
 //                     recvMessage[len] = 0;
 //                     std::cout << recvMessage; //  << std::endl;
 //                 }
+//                 else {
+//                     std::cout << "No message received, errorCode: " << errorCode << std::endl;
+//                 }
 //             }
 //         } else {
-//             std::cout << "Error: Could not send message" << std::endl;
+//             std::cout << "Error: Could not send message, errorCode: " << errorCode << std::endl;
 //         }
 
 //         std::cout << "FYI: Disconnect" << std::endl;
