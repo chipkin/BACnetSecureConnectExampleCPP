@@ -30,9 +30,14 @@
 #include "ChipkinEndianness.h"
 #include "ChipkinUtilities.h"
 
+// Enums and Constants
+#include "BACnetSCConstants.h"
+
 // System and OS
 #include <iostream>
 #include <string>
+#include <iomanip>
+#include <cstdio>
 #ifndef __GNUC__   // Windows
 #include <conio.h> // _kbhit
 #else              // Linux
@@ -57,6 +62,8 @@ void Sleep(int milliseconds) {
 }
 #endif // __GNUC__
 
+using namespace CASBACnetStack;
+
 // Globals
 // ===========================================================================
 ExampleDatabase g_database; // The example database that stores current values.
@@ -69,11 +76,11 @@ const uint32_t MAX_RENDER_BUFFER_LENGTH = 1024 * 20;
 // Network Settings and Globals
 // ===========================================================================
 
-WSNetworkLayer ws_network;
-const bool IS_WSS = true;
-const std::string WS_URI = "";
-const uint16_t WS_PORT = 8443;
-const std::string WS_ADDRESS = "192.168.1.159";
+WSNetworkLayer g_ws_network;
+//const bool IS_WSS = true;
+//const std::string WS_URI = "";
+//const uint16_t WS_PORT = 8443;
+//const std::string WS_ADDRESS = "192.168.1.159";
 
 // Callback Functions to Register to the DLL
 // ===========================================================================
@@ -88,6 +95,10 @@ void CallbackLogDebugMessage(const char *message, const uint16_t messageLength, 
 // Get Property Functions
 bool CallbackGetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, char *value, uint32_t *valueElementCount, const uint32_t maxElementCount, uint8_t *encodingType, const bool useArrayIndex, const uint32_t propertyArrayIndex);
 bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, float *value, const bool useArrayIndex, const uint32_t propertyArrayIndex);
+
+// Websocket Callbacks
+bool CallbackInitiateWebsocket(const char* websocketUri, const uint32_t websocketUriLength);
+void CallbackDisconnectWebsocket(const char* websocketUri, const uint32_t websocketUriLength);
 
 // A simple BACnetServerExample in CPP that uses secure connection
 // ===========================================================================
@@ -111,27 +122,30 @@ int main(int argc, char **argv) {
     // Setup connection
     // ---------------------------------------------------------------------------
     // Store network settings to DB
-    // TODO - necessary? Come back later at the end, access network/connection string directly for now
 
-    // Build URI
-    WSURI uri = "";
-    if (IS_WSS) {
-        uri += "wss://";
-    } else {
-        // TODO: Error code: WEBSOCKET_SCHEME_NOT_SUPPORTED
-        return false;
-    }
-    uri += WS_ADDRESS + ":" + std::to_string(WS_PORT) + "/";
 
-    // Attempt WS/WSS connection
-    if (!ws_network.AddConnection(uri)) {
-        // Connection unsuccessful
-        std::cerr << "Failed to connect to websocket" << std::endl;
-        std::cerr << "Press any key to exit the application..." << std::endl;
-        (void)getchar();
-        return EXIT_FAILURE;
-    }
-    std::cout << "OK, Connected to uri=[" << uri << "]" << std::endl;
+
+
+    //// Build URI
+    //WSURI uri = "";
+    //if (IS_WSS) {
+    //    uri += "wss://";
+    //} else {
+    //    // TODO: Error code: WEBSOCKET_SCHEME_NOT_SUPPORTED
+    //    return false;
+    //}
+    //uri += WS_ADDRESS + ":" + std::to_string(WS_PORT) + "/";
+
+    //// Attempt WS/WSS connection
+    //uint8_t errorCode = 0;
+    //if (!ws_network.AddConnection(uri, &errorCode)) {
+    //    // Connection unsuccessful
+    //    std::cerr << "Failed to connect to websocket" << std::endl;
+    //    std::cerr << "Press any key to exit the application..." << std::endl;
+    //    (void)getchar();
+    //    return EXIT_FAILURE;
+    //}
+    //std::cout << "OK, Connected to uri=[" << uri << "]" << std::endl;
 
     // Setup callbacks
     // ---------------------------------------------------------------------------
@@ -147,6 +161,10 @@ int main(int argc, char **argv) {
     // Get Property callback functions
     fpRegisterCallbackGetPropertyCharacterString(CallbackGetPropertyCharString);
     fpRegisterCallbackGetPropertyReal(CallbackGetPropertyReal);
+
+    // Websocket callback functions
+    fpRegisterCallbackInitiateWebsocket(CallbackInitiateWebsocket);
+    fpRegisterCallbackDisconnectWebsocket(CallbackDisconnectWebsocket);
 
     // Setup the BACnet device
     // ---------------------------------------------------------------------------
@@ -171,22 +189,26 @@ int main(int argc, char **argv) {
     fpSetPropertyByObjectTypeEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_INPUT, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_RELIABILITY, true);
     std::cout << "OK" << std::endl;
 
-    // NetworkPort (NP)
-    std::cout << "Added NetworkPort. networkPort.instance=[" << g_database.networkPort.instance << "]... ";
-    if (!fpAddNetworkPortObject(g_database.device.instance, g_database.networkPort.instance, CASBACnetStackExampleConstants::NETWORK_TYPE_IPV4, CASBACnetStackExampleConstants::PROTOCOL_LEVEL_BACNET_APPLICATION, CASBACnetStackExampleConstants::NETWORK_PORT_LOWEST_PROTOCOL_LAYER)) {
-        std::cerr << "Failed to add NetworkPort" << std::endl;
+    // Setup BACnet SC
+    // ---------------------------------------------------------------------------
+    const uint8_t uuid[BACnetSCConstants::BACNET_SC_DEVICE_UUID_LENGTH] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+    std::cout << "Setting BACnetSC UUID... ";
+    if (!fpSetBACnetSCUuid(uuid, BACnetSCConstants::BACNET_SC_DEVICE_UUID_LENGTH)) {
+        std::cerr << "Failed to set the uuid" << std::endl;
         return -1;
     }
-    fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_ACCEPT_FD_REGISTRATIONS, true);
-    fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_BROADCAST_DISTRIBUTION_TABLE, true);
-    fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_NETWORK_PORT, g_database.networkPort.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_BBMD_FOREIGN_DEVICE_TABLE, true);
+    std::cout << "OK" << std::endl;
 
-    uint8_t ipPortConcat[6];
-    memcpy(ipPortConcat, g_database.networkPort.IPAddress, 4);
-    ipPortConcat[4] = g_database.networkPort.BACnetIPUDPPort / 256;
-    ipPortConcat[5] = g_database.networkPort.BACnetIPUDPPort % 256;
-    fpAddBDTEntry(ipPortConcat, 6, g_database.networkPort.IPSubnetMask, 4); // First BDT Entry must be server device
-
+    std::cout << "Setting up HubConnector... " << std::endl;
+    const uint8_t vmac[BACnetSCConstants::BACNET_SC_VMAC_LENGTH] = { 0x09, 0x09, 0x09, 0x09 , 0x09 , 0x09 };
+    std::string primaryHubUri = "ws://192.168.1.72:4443/";
+    std::string failoverHubUri = "ws://localhost:4444/";
+    std::cout << "  Connecting To primaryUri: " << primaryHubUri << std::endl;
+    std::cout << "  Connecting To failoverUri: " << failoverHubUri << std::endl;
+    if (!fpSetBACnetSCHubConnector(vmac, BACnetSCConstants::BACNET_SC_VMAC_LENGTH, primaryHubUri.c_str(), primaryHubUri.size(), failoverHubUri.c_str(), failoverHubUri.size())) {
+        std::cerr << "Failed to set the hub connector settings" << std::endl;
+        return -1;
+    }
     std::cout << "OK" << std::endl;
 
     // Start the main loop
@@ -275,6 +297,8 @@ uint16_t CallbackReceiveMessage(uint8_t *message, const uint16_t maxMessageLengt
 
 // Callback used by the BACnet Stack to send a BACnet message
 uint16_t CallbackSendMessage(const uint8_t *message, const uint16_t messageLength, const uint8_t *connectionString, const uint8_t connectionStringLength, const uint8_t networkType, bool broadcast) {
+    (void)broadcast;    // Not used by SC
+
     // Check parameters
     if (message == NULL || messageLength == 0) {
         std::cout << "Nothing to send" << std::endl;
@@ -284,6 +308,23 @@ uint16_t CallbackSendMessage(const uint8_t *message, const uint16_t messageLengt
         std::cout << "No connection string" << std::endl;
         return 0;
     }
+
+    if (networkType == CASBACnetStackExampleConstants::NETWORK_TYPE_SC) {
+        // Handle BACnet SC message
+        uint8_t errorCode = 0;
+        size_t sentBytes = g_ws_network.SendWSMessage(WSURI((char*)connectionString, connectionStringLength), message, messageLength, &errorCode);
+
+        if (sentBytes == 0) {
+            // ToDo: handle error
+            fpSetBACnetSCWebSocketStatus((char*)connectionString, connectionStringLength, BACnetSCConstants::WebsocketStatus_Disconnected, 0);
+            return 0;
+        }
+
+        return sentBytes;
+    }
+
+    // Otherwise, ignore
+    return 0;
 
     // TODO: Implement SC Send Message
 
@@ -346,7 +387,7 @@ uint16_t CallbackSendMessage(const uint8_t *message, const uint16_t messageLengt
 // ---------------------------------------------------------------------------
 // Callback used by the BACnet Stack to get the current time
 time_t CallbackGetSystemTime() {
-    return time(0) - g_database.device.currentTimeOffset;
+    return time(0);
 }
 
 void CallbackLogDebugMessage(const char *message, const uint16_t messageLength, const uint8_t messageType) {
@@ -397,6 +438,30 @@ bool CallbackGetPropertyReal(uint32_t deviceInstance, uint16_t objectType, uint3
         }
     }
     return false;
+}
+
+// Websocket Callbacks
+
+bool CallbackInitiateWebsocket(const char* websocketUri, const uint32_t websocketUriLength) {
+    WSURI uri = WSURI(websocketUri, websocketUriLength);
+
+    // Add connection to the network
+
+    uint8_t errorCode = 0;
+    if (g_ws_network.AddConnection(uri, &errorCode)) {
+        std::cout << "Connected to uri=[" << uri << "]" << std::endl;
+        fpSetBACnetSCWebSocketStatus(websocketUri, websocketUriLength, BACnetSCConstants::WebsocketStatus_Connected, 0);
+        return true;
+    }
+    else {
+        std::cout << "Error: Could not connect: ErrorCode: " << errorCode << std::endl;
+        fpSetBACnetSCWebSocketStatus(websocketUri, websocketUriLength, BACnetSCConstants::WebsocketStatus_Error, errorCode);
+        return false;
+    }
+}
+
+void CallbackDisconnectWebsocket(const char* websocketUri, const uint32_t websocketUriLength) {
+    return;
 }
 
 // EXAMPLE: Send and receive with websockets

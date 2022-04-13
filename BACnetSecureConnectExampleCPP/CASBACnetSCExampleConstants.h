@@ -21,6 +21,7 @@ public:
 	// CAS BACnet Stack network type
 	static const uint8_t NETWORK_TYPE_IP = 0;
 	static const uint8_t NETWORK_TYPE_MSTP = 1;
+	static const uint8_t NETWORK_TYPE_SC = 2;
 
 
 	// General Constants

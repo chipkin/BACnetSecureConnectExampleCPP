@@ -113,12 +113,11 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
     std::string hostStr = uriSplit.Host;
     hostStr += ':' + std::to_string(ep.port());
 
-    // Set a decorator to change the User-Agent of the handshake
+    // Set a decorator to change the sec-websocket-protocol of the handshake
     m_ws->set_option(websocket::stream_base::decorator(
         [](websocket::request_type &req) {
-            req.set(http::field::user_agent,
-                    std::string(BOOST_BEAST_VERSION_STRING) +
-                        " websocket-client-coro");
+            req.set(http::field::sec_websocket_protocol,
+                    "hub.bsc.bacnet.org");
         }));
 
     // Perform the websocket handshake
@@ -147,6 +146,7 @@ size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t me
 
     try {
         // Send the message
+        this->m_ws->binary(true);
         return this->m_ws->write(net::buffer(message, messageLength));
     } catch (std::exception const &e) {
         this->Disconnect();
