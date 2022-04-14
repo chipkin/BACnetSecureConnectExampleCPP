@@ -2477,5 +2477,8 @@
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCCommon.h">
       <Filter>CASBACnetStack\BACnetSC</Filter>
     </ClInclude>
+    <ClInclude Include="CIBuildSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

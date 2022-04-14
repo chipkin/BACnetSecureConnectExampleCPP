@@ -32,6 +32,7 @@
 
 // Enums and Constants
 #include "BACnetSCConstants.h"
+#include "CIBuildSettings.h"
 
 // System and OS
 #include <iostream>
@@ -77,10 +78,9 @@ const uint32_t MAX_RENDER_BUFFER_LENGTH = 1024 * 20;
 // ===========================================================================
 
 WSNetworkLayer g_ws_network;
-//const bool IS_WSS = true;
-//const std::string WS_URI = "";
-//const uint16_t WS_PORT = 8443;
-//const std::string WS_ADDRESS = "192.168.1.159";
+
+const std::string primaryHubUri = "ws://192.168.1.72:4443/";
+const std::string failoverHubUri = "ws://localhost:4444/";
 
 // Callback Functions to Register to the DLL
 // ===========================================================================
@@ -100,6 +100,9 @@ bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objec
 bool CallbackInitiateWebsocket(const char* websocketUri, const uint32_t websocketUriLength);
 void CallbackDisconnectWebsocket(const char* websocketUri, const uint32_t websocketUriLength);
 
+// Helper Functions
+bool DoUserInput();
+
 // A simple BACnetServerExample in CPP that uses secure connection
 // ===========================================================================
 int main(int argc, char **argv) {
@@ -118,34 +121,6 @@ int main(int argc, char **argv) {
     }
     std::cout << "OK" << std::endl;
     std::cout << "FYI: CAS BACnet Stack version: " << fpGetAPIMajorVersion() << "." << fpGetAPIMinorVersion() << "." << fpGetAPIPatchVersion() << "." << fpGetAPIBuildVersion() << std::endl;
-
-    // Setup connection
-    // ---------------------------------------------------------------------------
-    // Store network settings to DB
-
-
-
-
-    //// Build URI
-    //WSURI uri = "";
-    //if (IS_WSS) {
-    //    uri += "wss://";
-    //} else {
-    //    // TODO: Error code: WEBSOCKET_SCHEME_NOT_SUPPORTED
-    //    return false;
-    //}
-    //uri += WS_ADDRESS + ":" + std::to_string(WS_PORT) + "/";
-
-    //// Attempt WS/WSS connection
-    //uint8_t errorCode = 0;
-    //if (!ws_network.AddConnection(uri, &errorCode)) {
-    //    // Connection unsuccessful
-    //    std::cerr << "Failed to connect to websocket" << std::endl;
-    //    std::cerr << "Press any key to exit the application..." << std::endl;
-    //    (void)getchar();
-    //    return EXIT_FAILURE;
-    //}
-    //std::cout << "OK, Connected to uri=[" << uri << "]" << std::endl;
 
     // Setup callbacks
     // ---------------------------------------------------------------------------
@@ -201,8 +176,6 @@ int main(int argc, char **argv) {
 
     std::cout << "Setting up HubConnector... " << std::endl;
     const uint8_t vmac[BACnetSCConstants::BACNET_SC_VMAC_LENGTH] = { 0x09, 0x09, 0x09, 0x09 , 0x09 , 0x09 };
-    std::string primaryHubUri = "ws://192.168.1.72:4443/";
-    std::string failoverHubUri = "ws://localhost:4444/";
     std::cout << "  Connecting To primaryUri: " << primaryHubUri << std::endl;
     std::cout << "  Connecting To failoverUri: " << failoverHubUri << std::endl;
     if (!fpSetBACnetSCHubConnector(vmac, BACnetSCConstants::BACNET_SC_VMAC_LENGTH, primaryHubUri.c_str(), primaryHubUri.size(), failoverHubUri.c_str(), failoverHubUri.size())) {
@@ -217,13 +190,64 @@ int main(int argc, char **argv) {
     for (;;) {
         fpLoop();
 
-        g_database.Loop(); // Increment Analog Input object Present Value property
+        // Handle User Input
+        if (!DoUserInput()) {
+            // User press 'q' to quit the example application.
+            break;
+        }
+
+        g_database.Loop();   // Increment Analog Input object Present Value property
+        g_ws_network.Loop(); // Process the network loop
 
         // Call Sleep to give some time back to the system
         Sleep(0); // Windows
     }
-
     return EXIT_SUCCESS;
+}
+
+// Helper Functions
+// ===========================================================================
+
+// Handle User Input
+// Handle any user input.
+// Note: User input in this example is used for the following:
+//		i - increment the analog-input value. Used to test COV
+//		h - Display options
+//      w - send Who-is broadcast
+//		q - Quit
+bool DoUserInput() {
+    // Check to see if the user hit any key
+    if (!_kbhit()) {
+        // No keys have been hit
+        return true;
+    }
+
+    // Extract the letter that the user hit and convert it to lower case
+    char action = tolower(getchar());
+
+    // Handle the action 
+    switch (action) {
+        // Quit
+    case 'q': {
+        return false;
+    }
+        // Send Who-is
+    case 'w': {
+        size_t uriLength = primaryHubUri.size();
+        fpSendWhoIs((const uint8_t*)primaryHubUri.c_str(), primaryHubUri.size(), CASBACnetStackExampleConstants::NETWORK_TYPE_SC, true, 0, NULL, 0);
+        break;
+    }
+    case 'h':
+    default: {
+        // Print the Help
+        std::cout << std::endl << std::endl;
+        // Print the application version information 
+        std::cout << "CAS BACnet Stack Server Example v" << APPLICATION_VERSION << "." << CIBUILDNUMBER << std::endl;
+        break;
+    }
+    }
+
+    return true;
 }
 
 // Callback Implementations
@@ -244,6 +268,16 @@ uint16_t CallbackReceiveMessage(uint8_t *message, const uint16_t maxMessageLengt
     if (maxConnectionStringLength < 6) {
         std::cerr << "Not enough space for a UDP connection string" << std::endl;
         return 0;
+    }
+
+    // Check the primary
+    uint8_t errorCode = 0;
+    uint16_t bytesRead = g_ws_network.RecvWSMessage(primaryHubUri, message, maxMessageLength, &errorCode);
+    if (bytesRead > 0) {
+        *networkType = CASBACnetStackExampleConstants::NETWORK_TYPE_SC;
+        memcpy(receivedConnectionString, primaryHubUri.c_str(), primaryHubUri.size());
+        *receivedConnectionStringLength = primaryHubUri.size();
+        return bytesRead;
     }
 
     // TODO: Implement SC Receive Message

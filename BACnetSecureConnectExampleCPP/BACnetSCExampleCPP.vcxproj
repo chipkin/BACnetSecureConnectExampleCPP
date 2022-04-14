@@ -940,6 +940,7 @@
     <ClInclude Include="..\submodules\cas-bacnet-stack\submodules\cas-common\source\ChipkinUtilities.h" />
     <ClInclude Include="CASBACnetSCExampleConstants.h" />
     <ClInclude Include="CASBACnetSCExampleDatabase.h" />
+    <ClInclude Include="CIBuildSettings.h" />
     <ClInclude Include="submodules\cas-bacnet-stack\source\BACnetSCConnection.h" />
     <ClInclude Include="WSClient.h" />
   </ItemGroup>
