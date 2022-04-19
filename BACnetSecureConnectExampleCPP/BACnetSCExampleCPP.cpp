@@ -79,7 +79,7 @@ const uint32_t MAX_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 WSNetworkLayer g_ws_network;
 
-const std::string primaryHubUri = "ws://192.168.1.72:4443/";
+const std::string primaryHubUri = "ws://localhost:4443/";
 const std::string failoverHubUri = "ws://localhost:4444/";
 
 // Callback Functions to Register to the DLL
@@ -197,7 +197,6 @@ int main(int argc, char **argv) {
         }
 
         g_database.Loop();   // Increment Analog Input object Present Value property
-        g_ws_network.Loop(); // Process the network loop
 
         // Call Sleep to give some time back to the system
         Sleep(0); // Windows

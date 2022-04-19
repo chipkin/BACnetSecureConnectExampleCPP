@@ -4,6 +4,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
+#include <boost/asio/strand.hpp>
 
 // SSL
 #include <boost/asio/ssl/context.hpp>
@@ -15,6 +16,9 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -30,12 +34,13 @@ typedef std::string WSURI;
 
 #define WEB_SOCKET_DEFAULT_PORT_NOT_SECURE "80"
 #define WEB_SOCKET_DEFAULT_PORT_SECURE "443"
+#define IOC_THREADS 1
 
 //
 // WSClientBase
 // ----------------------------------------------------------------------------
 //
-class WSClientBase {
+class WSClientBase{
 private:
 public:
     virtual bool IsConnected() = 0;
@@ -46,23 +51,125 @@ public:
 };
 
 //
-// WSClient
+// WSClientAsync
 // ----------------------------------------------------------------------------
-// Based off of https://github.com/boostorg/beast/tree/develop/example/websocket/client/sync
+// Based off of https://www.boost.org/doc/libs/develop/libs/beast/example/websocket/client/async/websocket_client_async.cpp
+class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecureAsync> {
+    tcp::resolver resolver;
+    websocket::stream<beast::tcp_stream> ws;
+    std::string host;
+    std::string port;
+    uint8_t* errorCode;
+
+    // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
+    // Use a separate thread for ioc->run().
+    net::io_context* ioc;
+    std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
+
+    // Should we add lock guards for this?
+    beast::flat_buffer buffer;
+    size_t bytesRead;
+    size_t bytesWritten;
+
+    // Locks for read operation
+    std::mutex readLenMtx;
+
+    // Locks for write operation
+    std::mutex writeLenMtx;
+
+public:
+    // NOTE: beast does not allow multiple calls of the same async function at the same time:
+    // soft_mutex.cpp:83:
+    //      If this assert goes off it means you are attempting to
+    //      simultaneously initiate more than one of same asynchronous
+    //      operation, which is not allowed. For example, you must wait
+    //      for an async_read to complete before performing another
+    //      async_read.
+
+    // Conditional variables and locks
+    std::condition_variable readCv;
+    std::condition_variable writeCv;
+    std::condition_variable closeCv;
+    std::mutex readMtx;
+    std::mutex writeMtx;
+    std::mutex closeMtx;
+    bool readDone;
+    bool writeDone;
+    bool closeDone;
+
+    // Constructor
+    explicit WSClientUnsecureAsync(net::io_context& ioc)
+        : resolver(net::make_strand(ioc))
+        , ws(net::make_strand(ioc)) {
+        this->ioc = &ioc;
+    }
+
+    // Async functions
+    void run(const WSURI uri, uint8_t* errorCode);
+    void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
+    void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
+    void onHandshake(beast::error_code errorCode);
+    void doWrite(const uint8_t* message, const uint16_t messageLength);     // NOTE: onWrite() must be called after doWrite()
+    void onWrite(beast::error_code errorCode, std::size_t bytesWritten);    // NOTE: getBytesWritten() must be called after onWrite()
+    void doRead();      // NOTE: onRead() must be called after doRead()
+    void onRead(beast::error_code errorCode, std::size_t bytesRead);        // NOTE: getReadMessage() must be called after onRead()
+    void doClose();    
+    void onClose(beast::error_code errorCode);
+
+    // Getters
+    size_t getReadMessage(uint8_t* message, uint16_t maxMessageLength);
+    size_t getBytesWritten();
+
+    // Status
+    bool IsConnected();
+
+
+};
+
+//
+// WSUnsecureClient
+// ----------------------------------------------------------------------------
+// Wraps WSUnsecureClientAsync into a synchronous interface
 class WSClientUnsecure : public WSClientBase {
 private:
-    // The io_context is required for all I/O
+    //// The io_context is required for all I/O
+    //net::io_context ioc;
+
+    //bool isConnected;
+
+    //// Buffer
+    //beast::flat_buffer buffer;
+    //std::string host;
+    //std::string message;
+    std::shared_ptr<WSClientUnsecureAsync> async_ws;
     net::io_context ioc;
 
-    websocket::stream<tcp::socket> *m_ws;
+    // NOTE: beast does not allow multiple calls of the same async function at the same time:
+    // soft_mutex.cpp:83:
+    //      If this assert goes off it means you are attempting to
+    //      simultaneously initiate more than one of same asynchronous
+    //      operation, which is not allowed. For example, you must wait
+    //      for an async_read to complete before performing another
+    //      async_read.
+
+    // Conditional variables and locks
+    std::condition_variable readCv;
+    std::condition_variable writeCv;
+    std::condition_variable closeCv;
+    std::mutex readMtx;
+    std::mutex writeMtx;
+    std::mutex closeMtx;
+    bool readDone;
+    bool writeDone;
+    bool closeDone;
 
 public:
     WSClientUnsecure();
     bool IsConnected();
-    bool Connect(const WSURI uri, uint8_t *errorCode);
+    bool Connect(const WSURI uri, uint8_t* errorCode);
     void Disconnect();
-    size_t SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode);
-    size_t RecvWSMessage(uint8_t *message, const uint16_t maxMessageLength, uint8_t *errorCode);
+    size_t SendWSMessage(const uint8_t* message, const uint16_t messageLength, uint8_t* errorCode);
+    size_t RecvWSMessage(uint8_t* message, const uint16_t maxMessageLength, uint8_t* errorCode);
 };
 
 //

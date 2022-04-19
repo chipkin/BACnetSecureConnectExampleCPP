@@ -74,110 +74,350 @@ public:
 // ----------------------------------------------------------------------------
 
 WSClientUnsecure::WSClientUnsecure() {
-    this->m_ws = NULL;
+    this->async_ws = NULL;
 }
 
 bool WSClientUnsecure::IsConnected() {
-    if (this->m_ws != NULL) {
-        return this->m_ws->is_open();
+    if (this->async_ws != NULL) {
+
+        return this->async_ws->IsConnected();
     }
     return false;
 }
 
 bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
 
-    if (this->m_ws != NULL) {
+    //// These objects perform our I/O
+    //tcp::resolver resolver{ioc};
+    //this->m_ws = new websocket::stream<tcp::socket>(ioc);
+
+    //// Look up the domain name
+    //auto const results = resolver.resolve(uriSplit.Host, uriSplit.Port);
+
+    //// Make the connection on the IP address we get from a lookup
+    //auto ep = net::connect(m_ws->next_layer(), results);
+
+    //// Update the host_ string. This will provide the value of the
+    //// Host HTTP header during the WebSocket handshake.
+    //// See https://tools.ietf.org/html/rfc7230#section-5.4
+    //std::string hostStr = uriSplit.Host;
+    //hostStr += ':' + std::to_string(ep.port());
+
+    //// Set a decorator to change the sec-websocket-protocol of the handshake
+    //m_ws->set_option(websocket::stream_base::decorator(
+    //    [](websocket::request_type &req) {
+    //        req.set(http::field::sec_websocket_protocol,
+    //                "hub.bsc.bacnet.org");
+    //    }));
+
+    //// Perform the websocket handshake
+    //m_ws->handshake(hostStr, uriSplit.Path + uriSplit.QueryString);
+
+    //// Check to see if the web socket is connected.
+    //return m_ws->is_open();
+
+    if (this->IsConnected()) {
         // We are connected, reconnect
-        this->Disconnect();
-    }
-
-    // Extract the parts from the uri
-    Uri uriSplit = Uri::Parse(uri);
-    if (uriSplit.Port.size() <= 0) {
-        uriSplit.Port = WEB_SOCKET_DEFAULT_PORT_NOT_SECURE; // Default port 80
-    }
-
-    // These objects perform our I/O
-    tcp::resolver resolver{ioc};
-    this->m_ws = new websocket::stream<tcp::socket>(ioc);
-
-    // Look up the domain name
-    auto const results = resolver.resolve(uriSplit.Host, uriSplit.Port);
-
-    // Make the connection on the IP address we get from a lookup
-    auto ep = net::connect(m_ws->next_layer(), results);
-
-    // Update the host_ string. This will provide the value of the
-    // Host HTTP header during the WebSocket handshake.
-    // See https://tools.ietf.org/html/rfc7230#section-5.4
-    std::string hostStr = uriSplit.Host;
-    hostStr += ':' + std::to_string(ep.port());
-
-    // Set a decorator to change the sec-websocket-protocol of the handshake
-    m_ws->set_option(websocket::stream_base::decorator(
-        [](websocket::request_type &req) {
-            req.set(http::field::sec_websocket_protocol,
-                    "hub.bsc.bacnet.org");
-        }));
-
-    // Perform the websocket handshake
-    m_ws->handshake(hostStr, uriSplit.Path + uriSplit.QueryString);
-
-    // Check to see if the web socket is connected.
-    return m_ws->is_open();
-}
-void WSClientUnsecure::Disconnect() {
-    if (this->m_ws == NULL) {
-        return;
-    }
-
-    // Close the WebSocket connection
-    this->m_ws->close(websocket::close_code::normal);
-
-    // Remove the socket
-    delete this->m_ws;
-    this->m_ws = NULL;
-}
-
-size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode) {
-    if (this->m_ws == NULL) {
-        return 0; // Not connected
+        this->async_ws->doClose();
     }
 
     try {
-        // Send the message
-        this->m_ws->binary(true);
-        return this->m_ws->write(net::buffer(message, messageLength));
-    } catch (std::exception const &e) {
-        this->Disconnect();
+        // Start connection
+        this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
+        this->async_ws->run(uri, errorCode);
+
+        // DEBUG - stall until connected
+        while (!this->async_ws->IsConnected()) {
+            continue;
+        }
+    }
+    catch (std::exception const& e) {
+        // NOTE: Error code set in async for now, may produce bad errors
         std::cout << e.what() << std::endl;
+        return false;
+    }
+    return true;
+}
+void WSClientUnsecure::Disconnect() {
+    this->async_ws->doClose();
+}
+
+size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode) {
+    if (this->async_ws == NULL) {
+        return 0; // Not connected
+    }
+
+    //try {
+    //    // Send the message
+    //    this->m_ws->binary(true);
+    //    return this->m_ws->write(net::buffer(message, messageLength));
+    //} catch (std::exception const &e) {
+    //    this->Disconnect();
+    //    std::cout << e.what() << std::endl;
+    //    return 0;
+    //}
+    try {
+        this->async_ws->doWrite(message, messageLength);
+        return this->async_ws->getBytesWritten();
+    }
+    catch (std::exception const& e) {
+        // NOTE: Error code set in async for now, may produce bad errors
+        std::cout << e.what() << std::endl;
+        this->Disconnect();
         return 0;
     }
 }
 
 size_t WSClientUnsecure::RecvWSMessage(uint8_t *message, uint16_t maxMessageLength, uint8_t *errorCode) {
-    if (this->m_ws == NULL) {
+    if (this->async_ws == NULL) {
         return 0; // Not connected
     }
 
     try {
-        beast::flat_buffer buffer;
-        // Read a message into our buffer
-        size_t len = this->m_ws->read(buffer);
-        if (len > 0) {
-            std::string recivedMessage = beast::buffers_to_string(buffer.data());
-            if (recivedMessage.size() < maxMessageLength) {
-                // Fits in the buffer
-                memcpy(message, recivedMessage.c_str(), recivedMessage.size());
-                return len;
-            }
-        }
+        //beast::flat_buffer buffer;
+        //// Read a message into our buffer
+        //size_t len = this->m_ws->read(buffer);
+        //if (len > 0) {
+        //    std::string recivedMessage = beast::buffers_to_string(buffer.data());
+        //    if (recivedMessage.size() < maxMessageLength) {
+        //        // Fits in the buffer
+        //        memcpy(message, recivedMessage.c_str(), recivedMessage.size());
+        //        return len;
+        //    }
+        //}
+        this->async_ws->doRead();
+        this->async_ws->getReadMessage(message, maxMessageLength);
     } catch (std::exception const &e) {
-        this->Disconnect();
         std::cout << e.what() << std::endl;
+        this->Disconnect();
     }
     return 0;
 }
+
+//
+// WSClientUnsecureAsync
+// ----------------------------------------------------------------------------
+// Start asynchronous connection
+void WSClientUnsecureAsync::run(const WSURI uri, uint8_t *errorCode) {
+    std::cout << "in WSClientUnsecureAsync::run()" << std::endl;
+
+    Uri uriSplit = Uri::Parse(uri);
+    if (uriSplit.Port.size() <= 0) {
+        uriSplit.Port = WEB_SOCKET_DEFAULT_PORT_NOT_SECURE; // Default port 80
+    }
+
+    this->host = uriSplit.Host;
+    this->port = uriSplit.Port;
+    this->errorCode = errorCode;
+
+    resolver.async_resolve(this->host, this->port, beast::bind_front_handler(&WSClientUnsecureAsync::onResolve, shared_from_this()));
+    
+    // Run ioc->run() on separate thread
+    for (int offset = 0; offset < IOC_THREADS; offset++) {
+        this->threads.emplace_back([&] {
+            try {
+                this->ioc->run();
+                std::cout << "Error: ioc->run() ENDED\n";
+            }
+            catch (std::exception& e) {
+                std::cout << "DEBUG: ioc->run() EXCEPTION - " << e.what() << std::endl;
+            }});
+    }
+}
+
+// Host resolution done
+void WSClientUnsecureAsync::onResolve(beast::error_code errorCode, tcp::resolver::results_type results) {
+    std::cout << "in WSClientUnsecureAsync::onResolve()" << std::endl;
+
+    if (errorCode) {
+        *this->errorCode = ERROR_DNS_NAME_RESOLUTION_FAILED;
+    }
+
+    // Set timeout
+    beast::get_lowest_layer(this->ws).expires_after(std::chrono::seconds(30));
+
+    // Start async connection
+    beast::get_lowest_layer(this->ws).async_connect(results, beast::bind_front_handler(&WSClientUnsecureAsync::onConnect, shared_from_this()));
+}
+
+// Connection operation done
+void WSClientUnsecureAsync::onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint) {
+    std::cout << "in WSClientUnsecureAsync::onConnect()" << std::endl;
+
+    if (errorCode) {
+        *this->errorCode = ERROR_TCP_CONNECTION_REFUSED;
+    }
+
+    // Turn off timeout because websocket stream has it own timeout system
+    beast::get_lowest_layer(this->ws).expires_never();
+
+    // Set default timeout settings for websocket
+    this->ws.set_option(websocket::stream_base::timeout::suggested(beast::role_type::client));
+
+    // Set more options
+    this->ws.set_option(websocket::stream_base::decorator(
+        [](websocket::request_type& req) {
+            req.set(http::field::sec_websocket_protocol,
+                "hub.bsc.bacnet.org");
+        }));
+
+    // Update host string
+    host += ":" + std::to_string(endpoint.port());
+
+    // Start async handshake
+    this->ws.async_handshake(host, "/", beast::bind_front_handler(&WSClientUnsecureAsync::onHandshake, shared_from_this()));
+}
+
+void WSClientUnsecureAsync::onHandshake(beast::error_code errorCode) {
+    std::cout << "in WSClientUnsecureAsync::onHandShake()" << std::endl;
+
+    if (errorCode) {
+        *this->errorCode = ERROR_TCP_CONNECTION_REFUSED;    // Set to ERROR_TLS_SERVER_CERTIFICATE_ERROR for Secure Connect
+    }
+
+    // Add code here for post connection setup, if any
+}
+
+// Write to server
+void WSClientUnsecureAsync::doWrite(const uint8_t* message, const uint16_t messageLength) {
+    std::cout << "in WSClientUnsecureAsync::doWrite()" << std::endl;
+
+    this->writeDone = false;
+    std::unique_lock<std::mutex> lck(this->writeMtx);
+
+    // Write to socket
+    this->ws.binary(true);
+    this->ws.async_write(net::buffer(message, messageLength), beast::bind_front_handler(&WSClientUnsecureAsync::onWrite, shared_from_this()));
+
+    while (!this->writeDone) {
+        this->writeCv.wait(lck);
+    }
+}
+
+// Write operation done
+void WSClientUnsecureAsync::onWrite(beast::error_code errorCode, std::size_t bytesWritten) {
+    std::cout << "in WSClientUnsecureAsync::onWrite()" << std::endl;
+
+    if (errorCode) {
+        *this->errorCode = ERROR_TCP_ERROR;
+        return;
+    }
+
+    // Secure bytesWritten lock
+    this->writeLenMtx.lock();
+
+    // Write value
+    this->bytesWritten = bytesWritten;
+
+    // Unlock bytesWritten lock in getBytesWritten
+
+    // Free write operation lock
+    this->writeDone = true;
+    this->writeCv.notify_all();
+}
+
+size_t WSClientUnsecureAsync::getBytesWritten() {
+    std::cout << "in WSClientUnsecureAsync::getBytesWritten()" << std::endl;
+
+    if (this->bytesWritten <= 0) {
+        return 0;
+    }
+
+    size_t bytesWritten = this->bytesWritten;
+
+    // Free lock
+    this->writeLenMtx.unlock();
+
+    return bytesWritten;
+}
+
+// Read into our buffer
+void WSClientUnsecureAsync::doRead() {
+    std::cout << "in WSClientUnsecureAsync::doRead()" << std::endl;
+
+    this->readDone = false;
+    std::unique_lock<std::mutex> lck(this->readMtx);
+
+    // Read to buffer
+    this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
+
+    while (!this->readDone) {
+        this->readCv.wait(lck);
+    }
+}
+
+// Read operation done
+void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t bytesRead) {
+    std::cout << "in WSClientUnsecureAsync::onRead()" << std::endl;
+
+    if (errorCode) {
+        *this->errorCode = ERROR_TCP_ERROR;
+        return;
+    }
+
+    // Secure bytesRead lock
+    this->readLenMtx.lock();
+
+    this->bytesRead = bytesRead;
+
+    // Unlock bytesRead and readBuf lock in GetReadMessage
+
+    // Free read operation lock
+    this->readDone = true;
+    this->readCv.notify_all();
+}
+
+size_t WSClientUnsecureAsync::getReadMessage(uint8_t* message, uint16_t maxMessageLength) {
+    std::cout << "in WSClientUnsecureAsync::getReadMessage()" << std::endl;
+
+    // Copy buffer
+    size_t bytesRead = this->bytesRead;
+    if (bytesRead > 0) {
+        std::string recivedMessage = beast::buffers_to_string(buffer.data());
+        if (recivedMessage.size() < maxMessageLength) {
+            // Fits in the buffer
+            memcpy(message, recivedMessage.c_str(), recivedMessage.size());
+        }
+    }
+
+    // Free locks
+    this->readLenMtx.unlock();
+
+    return bytesRead;
+}
+
+// Close connection
+void WSClientUnsecureAsync::doClose() {
+    std::cout << "in WSClientUnsecureAsync::doClose()" << std::endl;
+
+    this->closeDone = false;
+    std::unique_lock<std::mutex> lck(this->closeMtx);
+
+    this->ws.async_close(websocket::close_code::normal, beast::bind_front_handler(&WSClientUnsecureAsync::onClose, shared_from_this()));
+
+    while (!this->closeDone) {
+        this->closeCv.wait(lck);
+    }
+}
+
+// Connection closed
+void WSClientUnsecureAsync::onClose(beast::error_code errorCode) {
+    std::cout << "in WSClientUnsecureAsync::onClose()" << std::endl;
+
+
+    if (errorCode) {
+        *this->errorCode = ERROR_TCP_ERROR;
+    }
+
+    // Free read operation lock
+    this->closeDone = true;
+    this->closeCv.notify_all();
+}
+
+bool WSClientUnsecureAsync::IsConnected() {
+    return this->ws.is_open();
+}
+
 
 //
 // WSClientSecure
