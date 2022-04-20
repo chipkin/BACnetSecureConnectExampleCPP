@@ -19,6 +19,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <queue>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
@@ -35,6 +36,7 @@ typedef std::string WSURI;
 #define WEB_SOCKET_DEFAULT_PORT_NOT_SECURE "80"
 #define WEB_SOCKET_DEFAULT_PORT_SECURE "443"
 #define IOC_THREADS 1
+#define READ_THREADS 1
 
 //
 // WSClientBase
@@ -66,16 +68,15 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     net::io_context* ioc;
     std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
 
-    // Should we add lock guards for this?
     beast::flat_buffer buffer;
-    size_t bytesRead;
     size_t bytesWritten;
-
-    // Locks for read operation
-    std::mutex readLenMtx;
 
     // Locks for write operation
     std::mutex writeLenMtx;
+
+    // Queue for messages
+    std::queue<std::string> messageQueue;
+    std::mutex messageQueueMtx;
 
 public:
     // NOTE: beast does not allow multiple calls of the same async function at the same time:
@@ -87,13 +88,10 @@ public:
     //      async_read.
 
     // Conditional variables and locks
-    std::condition_variable readCv;
     std::condition_variable writeCv;
     std::condition_variable closeCv;
-    std::mutex readMtx;
     std::mutex writeMtx;
     std::mutex closeMtx;
-    bool readDone;
     bool writeDone;
     bool closeDone;
 
@@ -117,8 +115,8 @@ public:
     void onClose(beast::error_code errorCode);
 
     // Getters
-    size_t getReadMessage(uint8_t* message, uint16_t maxMessageLength);
     size_t getBytesWritten();
+    size_t pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode);
 
     // Status
     bool IsConnected();
@@ -151,17 +149,6 @@ private:
     //      operation, which is not allowed. For example, you must wait
     //      for an async_read to complete before performing another
     //      async_read.
-
-    // Conditional variables and locks
-    std::condition_variable readCv;
-    std::condition_variable writeCv;
-    std::condition_variable closeCv;
-    std::mutex readMtx;
-    std::mutex writeMtx;
-    std::mutex closeMtx;
-    bool readDone;
-    bool writeDone;
-    bool closeDone;
 
 public:
     WSClientUnsecure();

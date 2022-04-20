@@ -147,15 +147,6 @@ size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t me
         return 0; // Not connected
     }
 
-    //try {
-    //    // Send the message
-    //    this->m_ws->binary(true);
-    //    return this->m_ws->write(net::buffer(message, messageLength));
-    //} catch (std::exception const &e) {
-    //    this->Disconnect();
-    //    std::cout << e.what() << std::endl;
-    //    return 0;
-    //}
     try {
         this->async_ws->doWrite(message, messageLength);
         return this->async_ws->getBytesWritten();
@@ -173,25 +164,7 @@ size_t WSClientUnsecure::RecvWSMessage(uint8_t *message, uint16_t maxMessageLeng
         return 0; // Not connected
     }
 
-    try {
-        //beast::flat_buffer buffer;
-        //// Read a message into our buffer
-        //size_t len = this->m_ws->read(buffer);
-        //if (len > 0) {
-        //    std::string recivedMessage = beast::buffers_to_string(buffer.data());
-        //    if (recivedMessage.size() < maxMessageLength) {
-        //        // Fits in the buffer
-        //        memcpy(message, recivedMessage.c_str(), recivedMessage.size());
-        //        return len;
-        //    }
-        //}
-        this->async_ws->doRead();
-        this->async_ws->getReadMessage(message, maxMessageLength);
-    } catch (std::exception const &e) {
-        std::cout << e.what() << std::endl;
-        this->Disconnect();
-    }
-    return 0;
+    return this->async_ws->pollQueue(message, maxMessageLength, errorCode);
 }
 
 //
@@ -222,6 +195,16 @@ void WSClientUnsecureAsync::run(const WSURI uri, uint8_t *errorCode) {
             catch (std::exception& e) {
                 std::cout << "DEBUG: ioc->run() EXCEPTION - " << e.what() << std::endl;
             }});
+    }
+
+    // Run async_read() on loop
+    for (int offset = 0; offset < READ_THREADS; offset++) {
+        this->threads.emplace_back([&] {
+            while (true) {
+                this->doRead();
+                std::cout << "INFO - Complete a read operation\n";
+            }
+        });
     }
 }
 
@@ -309,7 +292,8 @@ void WSClientUnsecureAsync::onWrite(beast::error_code errorCode, std::size_t byt
     // Write value
     this->bytesWritten = bytesWritten;
 
-    // Unlock bytesWritten lock in getBytesWritten
+    // Free bytesWritten lock
+    this->writeLenMtx.unlock();
 
     // Free write operation lock
     this->writeDone = true;
@@ -323,6 +307,9 @@ size_t WSClientUnsecureAsync::getBytesWritten() {
         return 0;
     }
 
+    // Secure lock
+    this->writeLenMtx.lock();
+
     size_t bytesWritten = this->bytesWritten;
 
     // Free lock
@@ -335,15 +322,8 @@ size_t WSClientUnsecureAsync::getBytesWritten() {
 void WSClientUnsecureAsync::doRead() {
     std::cout << "in WSClientUnsecureAsync::doRead()" << std::endl;
 
-    this->readDone = false;
-    std::unique_lock<std::mutex> lck(this->readMtx);
-
     // Read to buffer
     this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
-
-    while (!this->readDone) {
-        this->readCv.wait(lck);
-    }
 }
 
 // Read operation done
@@ -352,38 +332,17 @@ void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t byte
 
     if (errorCode) {
         *this->errorCode = ERROR_TCP_ERROR;
+        std::cout << "Error: error on read\n";
         return;
     }
 
-    // Secure bytesRead lock
-    this->readLenMtx.lock();
+    // Secure queue lock
+    this->messageQueueMtx.lock();
 
-    this->bytesRead = bytesRead;
+    this->messageQueue.push(beast::buffers_to_string(this->buffer));
 
-    // Unlock bytesRead and readBuf lock in GetReadMessage
-
-    // Free read operation lock
-    this->readDone = true;
-    this->readCv.notify_all();
-}
-
-size_t WSClientUnsecureAsync::getReadMessage(uint8_t* message, uint16_t maxMessageLength) {
-    std::cout << "in WSClientUnsecureAsync::getReadMessage()" << std::endl;
-
-    // Copy buffer
-    size_t bytesRead = this->bytesRead;
-    if (bytesRead > 0) {
-        std::string recivedMessage = beast::buffers_to_string(buffer.data());
-        if (recivedMessage.size() < maxMessageLength) {
-            // Fits in the buffer
-            memcpy(message, recivedMessage.c_str(), recivedMessage.size());
-        }
-    }
-
-    // Free locks
-    this->readLenMtx.unlock();
-
-    return bytesRead;
+    // Free queue lock
+    this->messageQueueMtx.unlock();
 }
 
 // Close connection
@@ -404,7 +363,6 @@ void WSClientUnsecureAsync::doClose() {
 void WSClientUnsecureAsync::onClose(beast::error_code errorCode) {
     std::cout << "in WSClientUnsecureAsync::onClose()" << std::endl;
 
-
     if (errorCode) {
         *this->errorCode = ERROR_TCP_ERROR;
     }
@@ -418,6 +376,35 @@ bool WSClientUnsecureAsync::IsConnected() {
     return this->ws.is_open();
 }
 
+// Poll queue for messages
+size_t WSClientUnsecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode) {
+    std::string currentMessage;
+
+    // Secure queue lock
+    this->messageQueueMtx.lock();
+
+    if (this->messageQueue.size() > 0) {
+        // There is message in queue
+        currentMessage = this->messageQueue.front();
+        this->messageQueue.pop();
+    }
+    else {
+        // No messages in queue
+        return 0;
+    }
+
+    // Free queue lock
+    this->messageQueueMtx.unlock();
+
+    // Copy to pointer
+    if (currentMessage.size() < maxMessageLength) {
+        memcpy(message, currentMessage.c_str(), currentMessage.size());
+        return currentMessage.size();
+    }
+    else {
+        return 0;
+    }
+}
 
 //
 // WSClientSecure
