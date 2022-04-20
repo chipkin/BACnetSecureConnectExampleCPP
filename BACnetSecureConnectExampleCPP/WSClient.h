@@ -5,6 +5,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/strand.hpp>
+#include <boost/asio/buffers_iterator.hpp>
 
 // SSL
 #include <boost/asio/ssl/context.hpp>
@@ -62,6 +63,7 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     std::string host;
     std::string port;
     uint8_t* errorCode;
+    bool doneHandshake;
 
     // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
     // Use a separate thread for ioc->run().
@@ -70,6 +72,7 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
 
     beast::flat_buffer buffer;
     size_t bytesWritten;
+    uint8_t bufArr[1024];
 
     // Locks for write operation
     std::mutex writeLenMtx;
@@ -77,6 +80,8 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     // Queue for messages
     std::queue<std::string> messageQueue;
     std::mutex messageQueueMtx;
+    bool readPending;
+    std::mutex notifyRead;
 
 public:
     // NOTE: beast does not allow multiple calls of the same async function at the same time:
@@ -100,6 +105,8 @@ public:
         : resolver(net::make_strand(ioc))
         , ws(net::make_strand(ioc)) {
         this->ioc = &ioc;
+        this->doneHandshake = false;
+        this->readPending = false;
     }
 
     // Async functions
@@ -141,6 +148,8 @@ private:
     //std::string message;
     std::shared_ptr<WSClientUnsecureAsync> async_ws;
     net::io_context ioc;
+
+    std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
 
     // NOTE: beast does not allow multiple calls of the same async function at the same time:
     // soft_mutex.cpp:83:

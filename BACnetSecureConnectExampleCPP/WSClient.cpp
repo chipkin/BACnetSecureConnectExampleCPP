@@ -122,12 +122,21 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
     }
 
     try {
-        // Start connection
-        this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
-        this->async_ws->run(uri, errorCode);
+        for (int offset = 0; offset < IOC_THREADS; offset++) {
+            this->threads.emplace_back([&] {
+                try {
+                    // Start connection
+                    this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
+                    this->async_ws->run(uri, errorCode);
+                    std::cout << "Error: this->async_ws->run() ENDED\n";
+                }
+                catch (std::exception& e) {
+                    std::cout << "DEBUG: this->async_ws->run() EXCEPTION - " << e.what() << std::endl;
+                }});
+        }
 
         // DEBUG - stall until connected
-        while (!this->async_ws->IsConnected()) {
+        while (this->async_ws == NULL) {
             continue;
         }
     }
@@ -145,6 +154,11 @@ void WSClientUnsecure::Disconnect() {
 size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode) {
     if (this->async_ws == NULL) {
         return 0; // Not connected
+    }
+    
+    // Stall for handshake
+    while (!this->async_ws->IsConnected()) {
+        continue;
     }
 
     try {
@@ -186,26 +200,32 @@ void WSClientUnsecureAsync::run(const WSURI uri, uint8_t *errorCode) {
     resolver.async_resolve(this->host, this->port, beast::bind_front_handler(&WSClientUnsecureAsync::onResolve, shared_from_this()));
     
     // Run ioc->run() on separate thread
-    for (int offset = 0; offset < IOC_THREADS; offset++) {
-        this->threads.emplace_back([&] {
-            try {
-                this->ioc->run();
-                std::cout << "Error: ioc->run() ENDED\n";
-            }
-            catch (std::exception& e) {
-                std::cout << "DEBUG: ioc->run() EXCEPTION - " << e.what() << std::endl;
-            }});
-    }
+    //for (int offset = 0; offset < IOC_THREADS; offset++) {
+    //    this->threads.emplace_back([&] {
+    //        try {
+    //            /*while (true) {
+    //                this->ioc->run();
+    //                std::cout << "Error: ioc->run() ENDED\n";
+    //            }*/
+    //            this->ioc->run();
+    //            std::cout << "Error: ioc->run() ENDED\n";
+    //        }
+    //        catch (std::exception& e) {
+    //            std::cout << "DEBUG: ioc->run() EXCEPTION - " << e.what() << std::endl;
+    //        }});
+    //}
+    this->ioc->run();
 
-    // Run async_read() on loop
-    for (int offset = 0; offset < READ_THREADS; offset++) {
-        this->threads.emplace_back([&] {
-            while (true) {
-                this->doRead();
-                std::cout << "INFO - Complete a read operation\n";
-            }
-        });
-    }
+    //// Run async_read() on loop
+    //for (int offset = 0; offset < READ_THREADS; offset++) {
+    //    this->threads.emplace_back([&] {
+    //        while (true) {
+    //            if (this->doneHandshake) {
+    //                this->doRead();
+    //            }
+    //        }
+    //    });
+    //}
 }
 
 // Host resolution done
@@ -235,7 +255,14 @@ void WSClientUnsecureAsync::onConnect(beast::error_code errorCode, tcp::resolver
     beast::get_lowest_layer(this->ws).expires_never();
 
     // Set default timeout settings for websocket
-    this->ws.set_option(websocket::stream_base::timeout::suggested(beast::role_type::client));
+    websocket::stream_base::timeout timeoutOptions{
+        std::chrono::seconds(30),   // handshake timeout
+        websocket::stream_base::none(),   // idle timeout
+        false    // keep alive pings
+    };
+
+    // Set the timeout options on the stream.
+    this->ws.set_option(timeoutOptions);
 
     // Set more options
     this->ws.set_option(websocket::stream_base::decorator(
@@ -259,6 +286,8 @@ void WSClientUnsecureAsync::onHandshake(beast::error_code errorCode) {
     }
 
     // Add code here for post connection setup, if any
+    this->doneHandshake = true;
+    this->doRead();
 }
 
 // Write to server
@@ -298,18 +327,21 @@ void WSClientUnsecureAsync::onWrite(beast::error_code errorCode, std::size_t byt
     // Free write operation lock
     this->writeDone = true;
     this->writeCv.notify_all();
+
+    this->doRead();
 }
 
 size_t WSClientUnsecureAsync::getBytesWritten() {
     std::cout << "in WSClientUnsecureAsync::getBytesWritten()" << std::endl;
 
-    if (this->bytesWritten <= 0) {
-        return 0;
-    }
-
     // Secure lock
     this->writeLenMtx.lock();
 
+    if (this->bytesWritten <= 0) {
+        // Free lock
+        this->writeLenMtx.unlock();
+        return 0;
+    }
     size_t bytesWritten = this->bytesWritten;
 
     // Free lock
@@ -320,26 +352,38 @@ size_t WSClientUnsecureAsync::getBytesWritten() {
 
 // Read into our buffer
 void WSClientUnsecureAsync::doRead() {
-    std::cout << "in WSClientUnsecureAsync::doRead()" << std::endl;
+    std::cout << "in WSClientUnsecureAsync::doRead()\n";
 
-    // Read to buffer
-    this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
+    // Secure notify lock
+    this->notifyRead.lock();
+
+    if (readPending) {
+        // Read to buffer
+        // this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
+        this->ws.async_read_some(net::buffer(this->bufArr, 1024), beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
+        
+        readPending = false;
+    }
+
+    // Free notify lock
+    this->notifyRead.unlock();
 }
 
 // Read operation done
 void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t bytesRead) {
-    std::cout << "in WSClientUnsecureAsync::onRead()" << std::endl;
-
+    std::cout << "in WSClientUnsecureAsync::onRead()\n";
     if (errorCode) {
         *this->errorCode = ERROR_TCP_ERROR;
-        std::cout << "Error: error on read\n";
         return;
     }
 
     // Secure queue lock
     this->messageQueueMtx.lock();
 
-    this->messageQueue.push(beast::buffers_to_string(this->buffer));
+    //auto bufferData = this->buffer.data();
+    //this->messageQueue.push(std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData)));
+    
+    this->messageQueue.push(std::string((char*)this->bufArr, bytesRead));
 
     // Free queue lock
     this->messageQueueMtx.unlock();
@@ -373,12 +417,21 @@ void WSClientUnsecureAsync::onClose(beast::error_code errorCode) {
 }
 
 bool WSClientUnsecureAsync::IsConnected() {
-    return this->ws.is_open();
+    //return this->ws.is_open();
+    return this->doneHandshake;
 }
 
 // Poll queue for messages
 size_t WSClientUnsecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode) {
     std::string currentMessage;
+
+    // Secure notify lock
+    this->notifyRead.lock();
+
+    readPending = true;
+
+    // Free notify lock
+    this->notifyRead.unlock();
 
     // Secure queue lock
     this->messageQueueMtx.lock();
@@ -390,6 +443,8 @@ size_t WSClientUnsecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLen
     }
     else {
         // No messages in queue
+        // Free queue lock
+        this->messageQueueMtx.unlock();
         return 0;
     }
 
