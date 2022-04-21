@@ -73,6 +73,7 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     beast::flat_buffer buffer;
     size_t bytesWritten;
     uint8_t bufArr[1024];
+    bool readPending;
 
     // Locks for write operation
     std::mutex writeLenMtx;
@@ -80,7 +81,6 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     // Queue for messages
     std::queue<std::string> messageQueue;
     std::mutex messageQueueMtx;
-    bool readPending;
     std::mutex notifyRead;
 
 public:
@@ -148,6 +148,7 @@ private:
     //std::string message;
     std::shared_ptr<WSClientUnsecureAsync> async_ws;
     net::io_context ioc;
+    net::executor_work_guard<boost::asio::io_context::executor_type> iocWorkGuard = boost::asio::make_work_guard(ioc);
 
     std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
 

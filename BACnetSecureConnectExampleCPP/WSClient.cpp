@@ -128,7 +128,7 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
                     // Start connection
                     this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
                     this->async_ws->run(uri, errorCode);
-                    std::cout << "Error: this->async_ws->run() ENDED\n";
+                    std::cout << "Error: this->async_ws->run() ENDED, not supposed to end\n";
                 }
                 catch (std::exception& e) {
                     std::cout << "DEBUG: this->async_ws->run() EXCEPTION - " << e.what() << std::endl;
@@ -354,19 +354,15 @@ size_t WSClientUnsecureAsync::getBytesWritten() {
 void WSClientUnsecureAsync::doRead() {
     std::cout << "in WSClientUnsecureAsync::doRead()\n";
 
-    // Secure notify lock
-    this->notifyRead.lock();
-
-    if (readPending) {
+    // Check if read already pending
+    if (!readPending) {
         // Read to buffer
-        // this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
-        this->ws.async_read_some(net::buffer(this->bufArr, 1024), beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
-        
-        readPending = false;
-    }
+        this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
+        //this->ws.async_read_some(net::buffer(this->bufArr, 1024), beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
 
-    // Free notify lock
-    this->notifyRead.unlock();
+        readPending = true;
+    }
+    
 }
 
 // Read operation done
@@ -374,19 +370,29 @@ void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t byte
     std::cout << "in WSClientUnsecureAsync::onRead()\n";
     if (errorCode) {
         *this->errorCode = ERROR_TCP_ERROR;
+        std::cout << "Error: WSClientUnsecureAsync::onRead() - " << errorCode << std::endl;
+        return;
+    }
+
+    if (!this->readPending) {
+        std::cout << "PANIC: WSClientUnsecureAsync::onRead() - read should be pending\n";
         return;
     }
 
     // Secure queue lock
     this->messageQueueMtx.lock();
 
-    //auto bufferData = this->buffer.data();
-    //this->messageQueue.push(std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData)));
+    auto bufferData = this->buffer.data();
+    std::cout << "INFO: onRead(), got message - " << std::hex << std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData)) << std::endl;
+    this->messageQueue.push(std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData)));
     
-    this->messageQueue.push(std::string((char*)this->bufArr, bytesRead));
+    //this->messageQueue.push(std::string((char*)this->bufArr, bytesRead));
 
     // Free queue lock
     this->messageQueueMtx.unlock();
+
+    // Read done, no read pending
+    this->readPending = false;
 }
 
 // Close connection
@@ -425,20 +431,13 @@ bool WSClientUnsecureAsync::IsConnected() {
 size_t WSClientUnsecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode) {
     std::string currentMessage;
 
-    // Secure notify lock
-    this->notifyRead.lock();
-
-    readPending = true;
-
-    // Free notify lock
-    this->notifyRead.unlock();
-
     // Secure queue lock
     this->messageQueueMtx.lock();
 
     if (this->messageQueue.size() > 0) {
         // There is message in queue
         currentMessage = this->messageQueue.front();
+        std::cout << "INFO: Got message from BACnet Hub - " << currentMessage << std::endl;
         this->messageQueue.pop();
     }
     else {
