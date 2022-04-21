@@ -137,28 +137,11 @@ public:
 // Wraps WSUnsecureClientAsync into a synchronous interface
 class WSClientUnsecure : public WSClientBase {
 private:
-    //// The io_context is required for all I/O
-    //net::io_context ioc;
-
-    //bool isConnected;
-
-    //// Buffer
-    //beast::flat_buffer buffer;
-    //std::string host;
-    //std::string message;
-    std::shared_ptr<WSClientUnsecureAsync> async_ws;
+    std::shared_ptr<WSClientUnsecureAsync> async_ws;        // shared_ptr for threading
     net::io_context ioc;
     net::executor_work_guard<boost::asio::io_context::executor_type> iocWorkGuard = boost::asio::make_work_guard(ioc);
 
     std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
-
-    // NOTE: beast does not allow multiple calls of the same async function at the same time:
-    // soft_mutex.cpp:83:
-    //      If this assert goes off it means you are attempting to
-    //      simultaneously initiate more than one of same asynchronous
-    //      operation, which is not allowed. For example, you must wait
-    //      for an async_read to complete before performing another
-    //      async_read.
 
 public:
     WSClientUnsecure();

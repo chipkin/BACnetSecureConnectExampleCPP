@@ -86,36 +86,6 @@ bool WSClientUnsecure::IsConnected() {
 }
 
 bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
-
-    //// These objects perform our I/O
-    //tcp::resolver resolver{ioc};
-    //this->m_ws = new websocket::stream<tcp::socket>(ioc);
-
-    //// Look up the domain name
-    //auto const results = resolver.resolve(uriSplit.Host, uriSplit.Port);
-
-    //// Make the connection on the IP address we get from a lookup
-    //auto ep = net::connect(m_ws->next_layer(), results);
-
-    //// Update the host_ string. This will provide the value of the
-    //// Host HTTP header during the WebSocket handshake.
-    //// See https://tools.ietf.org/html/rfc7230#section-5.4
-    //std::string hostStr = uriSplit.Host;
-    //hostStr += ':' + std::to_string(ep.port());
-
-    //// Set a decorator to change the sec-websocket-protocol of the handshake
-    //m_ws->set_option(websocket::stream_base::decorator(
-    //    [](websocket::request_type &req) {
-    //        req.set(http::field::sec_websocket_protocol,
-    //                "hub.bsc.bacnet.org");
-    //    }));
-
-    //// Perform the websocket handshake
-    //m_ws->handshake(hostStr, uriSplit.Path + uriSplit.QueryString);
-
-    //// Check to see if the web socket is connected.
-    //return m_ws->is_open();
-
     if (this->IsConnected()) {
         // We are connected, reconnect
         this->async_ws->doClose();
@@ -136,6 +106,7 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
         }
 
         // DEBUG - stall until connected
+        // TODO - replace this with conditional variable
         while (this->async_ws == NULL) {
             continue;
         }
@@ -157,6 +128,7 @@ size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t me
     }
     
     // Stall for handshake
+        // TODO - replace this with conditional variable
     while (!this->async_ws->IsConnected()) {
         continue;
     }
@@ -198,34 +170,8 @@ void WSClientUnsecureAsync::run(const WSURI uri, uint8_t *errorCode) {
     this->errorCode = errorCode;
 
     resolver.async_resolve(this->host, this->port, beast::bind_front_handler(&WSClientUnsecureAsync::onResolve, shared_from_this()));
-    
-    // Run ioc->run() on separate thread
-    //for (int offset = 0; offset < IOC_THREADS; offset++) {
-    //    this->threads.emplace_back([&] {
-    //        try {
-    //            /*while (true) {
-    //                this->ioc->run();
-    //                std::cout << "Error: ioc->run() ENDED\n";
-    //            }*/
-    //            this->ioc->run();
-    //            std::cout << "Error: ioc->run() ENDED\n";
-    //        }
-    //        catch (std::exception& e) {
-    //            std::cout << "DEBUG: ioc->run() EXCEPTION - " << e.what() << std::endl;
-    //        }});
-    //}
-    this->ioc->run();
-
-    //// Run async_read() on loop
-    //for (int offset = 0; offset < READ_THREADS; offset++) {
-    //    this->threads.emplace_back([&] {
-    //        while (true) {
-    //            if (this->doneHandshake) {
-    //                this->doRead();
-    //            }
-    //        }
-    //    });
-    //}
+   
+    this->ioc->run();       // This should not return
 }
 
 // Host resolution done
@@ -417,14 +363,25 @@ void WSClientUnsecureAsync::onClose(beast::error_code errorCode) {
         *this->errorCode = ERROR_TCP_ERROR;
     }
 
-    // Free read operation lock
+    this->doneHandshake = false;        // Reset handshake state
+
+    // Free close operation lock
     this->closeDone = true;
     this->closeCv.notify_all();
 }
 
 bool WSClientUnsecureAsync::IsConnected() {
+    // TODO: This is a hack, check for both ws.is_open() and handshake done later on
     //return this->ws.is_open();
     return this->doneHandshake;
+
+    //// TODO: Test this
+    //if (this->doneHandshake) {
+    //    return true;
+    //}
+    //else {
+    //    return this->ws.is_open();
+    //}
 }
 
 // Poll queue for messages
