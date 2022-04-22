@@ -234,3 +234,9 @@ static const uint8_t ERROR_HTTP_UNEXPECTED_RESPONSE_CODE = 152;
 static const uint8_t ERROR_HTTP_UPGRADE_REQUIRED = 161;
 static const uint8_t ERROR_HTTP_UPGRADE_ERROR = 162;
 static const uint8_t ERROR_HTTP_WEBSOCKET_HEADER_ERROR = 160;
+
+// Helper functions
+class WSCommon {
+public:
+    static std::string HexStringToString(std::string hexString);
+};

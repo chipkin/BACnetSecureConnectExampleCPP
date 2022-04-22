@@ -276,6 +276,16 @@ uint16_t CallbackReceiveMessage(uint8_t *message, const uint16_t maxMessageLengt
         *networkType = CASBACnetStackExampleConstants::NETWORK_TYPE_SC;
         memcpy(receivedConnectionString, primaryHubUri.c_str(), primaryHubUri.size());
         *receivedConnectionStringLength = primaryHubUri.size();
+
+
+        // Get the XML rendered version of the just sent message
+        static char xmlRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
+        if (fpDecodeAsXML((char*)message, bytesRead, xmlRenderBuffer, MAX_RENDER_BUFFER_LENGTH, CASBACnetStackExampleConstants::NETWORK_TYPE_SC) > 0) {
+            std::cout << xmlRenderBuffer << std::endl;
+            memset(xmlRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
+        }
+
+
         return bytesRead;
     }
 
@@ -352,6 +362,13 @@ uint16_t CallbackSendMessage(const uint8_t *message, const uint16_t messageLengt
             fpSetBACnetSCWebSocketStatus((char*)connectionString, connectionStringLength, BACnetSCConstants::WebsocketStatus_Disconnected, 0);
             return 0;
         }
+
+         // Get the XML rendered version of the just sent message
+         static char xmlRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
+         if (fpDecodeAsXML((char*)message, messageLength, xmlRenderBuffer, MAX_RENDER_BUFFER_LENGTH, networkType) > 0) {
+             std::cout << xmlRenderBuffer << std::endl;
+             memset(xmlRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
+         }
 
         return sentBytes;
     }

@@ -1,5 +1,6 @@
 #include "WSClient.h"
 #include <boost/asio/ssl/host_name_verification.hpp> // Explicit include - don't know why Visual Studio does not detect this
+#include <iomanip>
 
 //
 // Uri
@@ -247,6 +248,8 @@ void WSClientUnsecureAsync::doWrite(const uint8_t* message, const uint16_t messa
     this->ws.binary(true);
     this->ws.async_write(net::buffer(message, messageLength), beast::bind_front_handler(&WSClientUnsecureAsync::onWrite, shared_from_this()));
 
+    std::cout << "INFO: Send message - " << WSCommon::HexStringToString(std::string((char*)message, messageLength)) << std::endl;
+
     while (!this->writeDone) {
         this->writeCv.wait(lck);
     }
@@ -329,8 +332,12 @@ void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t byte
     this->messageQueueMtx.lock();
 
     auto bufferData = this->buffer.data();
-    std::cout << "INFO: onRead(), got message - " << std::hex << std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData)) << std::endl;
-    this->messageQueue.push(std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData)));
+
+    std::string bufferString = std::string(net::buffers_begin(bufferData), net::buffers_end(bufferData));
+
+    std::cout << "INFO: onRead(), got message - " << WSCommon::HexStringToString(bufferString) << std::endl;
+    this->messageQueue.push(bufferString);
+    this->buffer.consume(bytesRead);
     
     //this->messageQueue.push(std::string((char*)this->bufArr, bytesRead));
 
@@ -394,7 +401,7 @@ size_t WSClientUnsecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLen
     if (this->messageQueue.size() > 0) {
         // There is message in queue
         currentMessage = this->messageQueue.front();
-        std::cout << "INFO: Got message from BACnet Hub - " << currentMessage << std::endl;
+        std::cout << "INFO: Got message from BACnet Hub - " << WSCommon::HexStringToString(currentMessage) << std::endl;
         this->messageQueue.pop();
     }
     else {
@@ -633,4 +640,21 @@ size_t WSNetworkLayer::RecvWSMessage(const WSURI uri, uint8_t *message, const ui
 
     // Send message
     return ws->RecvWSMessage(message, maxMessageLength, errorCode);
+}
+
+std::string WSCommon::HexStringToString(std::string hexString) {
+    std::string output = "";
+    if (hexString.size() == 0) {
+        return output;
+    }
+
+    char temp[10];
+    memset(temp, 0, 10);
+    for (size_t i = 0; i < hexString.size(); i++) {
+        memset(temp, 0, 10);
+        snprintf(temp, 10, "%02X", hexString[i]);
+        output.append(temp);
+    }
+
+    return output;
 }
