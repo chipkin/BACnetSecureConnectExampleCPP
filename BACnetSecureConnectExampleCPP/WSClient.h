@@ -11,7 +11,7 @@
 #include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/beast/websocket/ssl.hpp>
-
+#include <boost/beast/ssl.hpp>
 #include <boost/bind.hpp>
 
 #include <cstdlib>
@@ -153,22 +153,98 @@ public:
 };
 
 //
+// WSClientAsync
+// ----------------------------------------------------------------------------
+// Based off of https://www.boost.org/doc/libs/develop/libs/beast/example/websocket/client/async-ssl/websocket_client_async_ssl.cpp
+class WSClientSecureAsync : public std::enable_shared_from_this<WSClientSecureAsync> {
+    tcp::resolver resolver;
+    websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws;
+    std::string host;
+    std::string port;
+    uint8_t* errorCode;
+    bool doneHandshake;
+
+    // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
+    // Use a separate thread for ioc->run().
+    net::io_context* ioc;
+    ssl::context* ctx;
+    std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
+
+    beast::flat_buffer buffer;
+    size_t bytesWritten;
+    uint8_t bufArr[1024];
+    bool readPending;
+
+    // Locks for write operation
+    std::mutex writeLenMtx;
+
+    // Queue for messages
+    std::queue<std::string> messageQueue;
+    std::mutex messageQueueMtx;
+    std::mutex notifyRead;
+
+public:
+    // NOTE: beast does not allow multiple calls of the same async function at the same time:
+    // soft_mutex.cpp:83:
+    //      If this assert goes off it means you are attempting to
+    //      simultaneously initiate more than one of same asynchronous
+    //      operation, which is not allowed. For example, you must wait
+    //      for an async_read to complete before performing another
+    //      async_read.
+
+    // Conditional variables and locks
+    std::condition_variable writeCv;
+    std::condition_variable closeCv;
+    std::mutex writeMtx;
+    std::mutex closeMtx;
+    bool writeDone;
+    bool closeDone;
+
+    // Constructor
+    explicit WSClientSecureAsync(net::io_context& ioc, ssl::context& ctx)
+        : resolver(net::make_strand(ioc))
+        , ws(net::make_strand(ioc), ctx) {
+        this->ioc = &ioc;
+        this->ctx = &ctx;
+        this->doneHandshake = false;
+        this->readPending = false;
+    }
+
+    // Async functions
+    void run(const WSURI uri, uint8_t* errorCode);
+    void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
+    void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
+    void onSslHandshake(beast::error_code errorCode);
+    void onHandshake(beast::error_code errorCode);
+    void doWrite(const uint8_t* message, const uint16_t messageLength);     // NOTE: onWrite() must be called after doWrite()
+    void onWrite(beast::error_code errorCode, std::size_t bytesWritten);    // NOTE: getBytesWritten() must be called after onWrite()
+    void doRead();      // NOTE: onRead() must be called after doRead()
+    void onRead(beast::error_code errorCode, std::size_t bytesRead);        // NOTE: getReadMessage() must be called after onRead()
+    void doClose();    
+    void onClose(beast::error_code errorCode);
+
+    // Getters
+    size_t getBytesWritten();
+    size_t pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode);
+
+    // Status
+    bool IsConnected();
+
+
+};
+
+//
 // WSClientSecure
 // ----------------------------------------------------------------------------
 // Based off of https://github.com/boostorg/beast/tree/develop/example/websocket/client/sync-ssl
 class WSClientSecure : public WSClientBase {
 private:
-    // The io_context is required for all I/O
+    std::shared_ptr<WSClientSecureAsync> async_ws;        // shared_ptr for threading
     net::io_context ioc;
+    ssl::context ctx{ssl::context::tlsv13_client};
+    net::executor_work_guard<boost::asio::io_context::executor_type> iocWorkGuard = boost::asio::make_work_guard(ioc);
 
-    // The SSL Context for configuring SSL options
-    ssl::context *ctx;
-
-    ssl::stream<tcp::socket> *m_wss;
-
-    // Uri info
-    bool isRawIP;
-    uint8_t ipOctetString[4];
+    std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
 
 public:
     WSClientSecure();
