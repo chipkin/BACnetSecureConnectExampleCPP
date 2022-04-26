@@ -101,6 +101,8 @@ public:
     //      async_read.
 
     // Conditional variables and locks
+    // Variables for Connect needs to be public, unless we make explicit functions for setup and wait
+    // Leave in public space for now, all abstracted by WSNetworkLayer anyways
     std::condition_variable writeCv;
     std::condition_variable closeCv;
     std::condition_variable connectCv;
@@ -164,6 +166,7 @@ public:
 // ----------------------------------------------------------------------------
 // Based off of https://www.boost.org/doc/libs/develop/libs/beast/example/websocket/client/async-ssl/websocket_client_async_ssl.cpp
 class WSClientSecureAsync : public std::enable_shared_from_this<WSClientSecureAsync> {
+private:
     tcp::resolver resolver;
     websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws;
     std::string host;
@@ -189,6 +192,15 @@ class WSClientSecureAsync : public std::enable_shared_from_this<WSClientSecureAs
     std::mutex messageQueueMtx;
     std::mutex notifyRead;
 
+    // Async functions
+    void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
+    void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
+    void onSslHandshake(beast::error_code errorCode);
+    void onHandshake(beast::error_code errorCode);
+    void onWrite(beast::error_code errorCode, std::size_t bytesWritten);    // NOTE: getBytesWritten() must be called after onWrite()
+    void onRead(beast::error_code errorCode, std::size_t bytesRead);        // NOTE: getReadMessage() must be called after onRead()
+    void onClose(beast::error_code errorCode);
+
 public:
     // NOTE: beast does not allow multiple calls of the same async function at the same time:
     // soft_mutex.cpp:83:
@@ -199,6 +211,9 @@ public:
     //      async_read.
 
     // Conditional variables and locks
+    // Conditional variables and locks
+    // Variables for Connect needs to be public, unless we make explicit functions for setup and wait
+    // Leave in public space for now, all abstracted by WSNetworkLayer anyways
     std::condition_variable writeCv;
     std::condition_variable closeCv;
     std::condition_variable connectCv;
@@ -219,23 +234,16 @@ public:
         this->readPending = false;
     }
 
-    // Async functions
-    void run(const WSURI uri);
-    void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
-    void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
-    void onSslHandshake(beast::error_code errorCode);
-    void onHandshake(beast::error_code errorCode);
-    void doWrite(const uint8_t* message, const uint16_t messageLength);     // NOTE: onWrite() must be called after doWrite()
-    void onWrite(beast::error_code errorCode, std::size_t bytesWritten);    // NOTE: getBytesWritten() must be called after onWrite()
-    void doRead();      // NOTE: onRead() must be called after doRead()
-    void onRead(beast::error_code errorCode, std::size_t bytesRead);        // NOTE: getReadMessage() must be called after onRead()
-    void doClose();    
-    void onClose(beast::error_code errorCode);
-
     // Getters
     size_t getBytesWritten();
     size_t pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode);
     uint8_t getAndResetErrorCode();
+
+    // Functions
+    void run(const WSURI uri);
+    void doWrite(const uint8_t* message, const uint16_t messageLength);
+    void doRead();
+    void doClose();
 
     // Status
     bool IsConnected();
