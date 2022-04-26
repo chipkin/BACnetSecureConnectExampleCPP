@@ -58,12 +58,12 @@ public:
 // ----------------------------------------------------------------------------
 // Based off of https://www.boost.org/doc/libs/develop/libs/beast/example/websocket/client/async/websocket_client_async.cpp
 class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecureAsync> {
+private:
     tcp::resolver resolver;
     websocket::stream<beast::tcp_stream> ws;
     std::string host;
     std::string port;
     uint8_t errorCode;
-    bool doneHandshake;
 
     // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
     // Use a separate thread for ioc->run().
@@ -83,6 +83,14 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     std::mutex messageQueueMtx;
     std::mutex notifyRead;
 
+    // Async functions
+    void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
+    void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
+    void onHandshake(beast::error_code errorCode);
+    void onWrite(beast::error_code errorCode, std::size_t bytesWritten);
+    void onRead(beast::error_code errorCode, std::size_t bytesRead);
+    void onClose(beast::error_code errorCode);
+
 public:
     // NOTE: beast does not allow multiple calls of the same async function at the same time:
     // soft_mutex.cpp:83:
@@ -95,10 +103,13 @@ public:
     // Conditional variables and locks
     std::condition_variable writeCv;
     std::condition_variable closeCv;
+    std::condition_variable connectCv;
     std::mutex writeMtx;
     std::mutex closeMtx;
+    std::mutex connectMtx;
     bool writeDone;
     bool closeDone;
+    bool connectDone;
 
     // Constructor
     explicit WSClientUnsecureAsync(net::io_context& ioc)
@@ -106,21 +117,15 @@ public:
         , ws(net::make_strand(ioc)) {
         this->errorCode = 0;
         this->ioc = &ioc;
-        this->doneHandshake = false;
         this->readPending = false;
     }
 
-    // Async functions
+    // Functions
     void run(const WSURI uri);
-    void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
-    void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
-    void onHandshake(beast::error_code errorCode);
-    void doWrite(const uint8_t* message, const uint16_t messageLength);     // NOTE: onWrite() must be called after doWrite()
-    void onWrite(beast::error_code errorCode, std::size_t bytesWritten);    // NOTE: getBytesWritten() must be called after onWrite()
-    void doRead();      // NOTE: onRead() must be called after doRead()
-    void onRead(beast::error_code errorCode, std::size_t bytesRead);        // NOTE: getReadMessage() must be called after onRead()
-    void doClose();    
-    void onClose(beast::error_code errorCode);
+    void doRead();
+    void doWrite(const uint8_t* message, const uint16_t messageLength);       // NOTE: getReadMessage() must be called after onRead()
+    void doClose();
+
 
     // Getters
     size_t getBytesWritten();
@@ -164,7 +169,6 @@ class WSClientSecureAsync : public std::enable_shared_from_this<WSClientSecureAs
     std::string host;
     std::string port;
     uint8_t errorCode;
-    bool doneHandshake;
 
     // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
     // Use a separate thread for ioc->run().
@@ -197,10 +201,13 @@ public:
     // Conditional variables and locks
     std::condition_variable writeCv;
     std::condition_variable closeCv;
+    std::condition_variable connectCv;
     std::mutex writeMtx;
     std::mutex closeMtx;
+    std::mutex connectMtx;
     bool writeDone;
     bool closeDone;
+    bool connectDone;
 
     // Constructor
     explicit WSClientSecureAsync(net::io_context& ioc, ssl::context& ctx)
@@ -209,7 +216,6 @@ public:
         this->errorCode = 0;
         this->ioc = &ioc;
         this->ctx = &ctx;
-        this->doneHandshake = false;
         this->readPending = false;
     }
 

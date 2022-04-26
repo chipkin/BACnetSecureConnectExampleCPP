@@ -92,12 +92,22 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
         this->async_ws->doClose();
     }
 
+    // Wrap async WSClient
+    this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
+
+
+    // Condition variables to stall for connection to be established
+    this->async_ws->connectDone = false;
+    std::unique_lock<std::mutex> lck(this->async_ws->connectMtx);
+
     try {
         for (int offset = 0; offset < IOC_THREADS; offset++) {
             this->threads.emplace_back([&] {
                 try {
-                    // Start connection
-                    this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
+                    //// Start connection
+                    //this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
+                    //
+
                     this->async_ws->run(uri);
                     std::cout << "Error: this->async_ws->run() ENDED, not supposed to end\n";
                 }
@@ -106,13 +116,8 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
                 }});
         }
 
-        // DEBUG - stall until connected
-        // TODO - replace this with conditional variable
-        while (this->async_ws == NULL) {
-            continue;
-        }
-        while (!this->async_ws->IsConnected()) {
-            continue;
+        while (!this->async_ws->connectDone) {
+            this->async_ws->connectCv.wait(lck);
         }
     }
     catch (std::exception const& e) {
@@ -133,12 +138,6 @@ void WSClientUnsecure::Disconnect() {
 size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode) {
     if (this->async_ws == NULL) {
         return 0; // Not connected
-    }
-    
-    // Stall for handshake
-        // TODO - replace this with conditional variable
-    while (!this->async_ws->IsConnected()) {
-        continue;
     }
 
     try {
@@ -241,9 +240,12 @@ void WSClientUnsecureAsync::onHandshake(beast::error_code errorCode) {
         this->errorCode = ERROR_TCP_CONNECTION_REFUSED;    // Set to ERROR_TLS_SERVER_CERTIFICATE_ERROR for Secure Connect
     }
 
+    // Notify websocket is connected
+    this->connectDone = true;
+    this->connectCv.notify_all();
+
     // Add code here for post connection setup, if any
-    this->doneHandshake = true;
-    this->doRead();
+    
 }
 
 // Write to server
@@ -316,8 +318,6 @@ void WSClientUnsecureAsync::doRead() {
     if (!readPending) {
         // Read to buffer
         this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
-        //this->ws.async_read_some(net::buffer(this->bufArr, 1024), beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
-
         readPending = true;
     }
     
@@ -347,8 +347,6 @@ void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t byte
     std::cout << "INFO: onRead(), got message - " << WSCommon::HexStringToString(bufferString) << std::endl;
     this->messageQueue.push(bufferString);
     this->buffer.consume(bytesRead);
-    
-    //this->messageQueue.push(std::string((char*)this->bufArr, bytesRead));
 
     // Free queue lock
     this->messageQueueMtx.unlock();
@@ -379,25 +377,15 @@ void WSClientUnsecureAsync::onClose(beast::error_code errorCode) {
         this->errorCode = ERROR_TCP_ERROR;
     }
 
-    this->doneHandshake = false;        // Reset handshake state
-
     // Free close operation lock
     this->closeDone = true;
     this->closeCv.notify_all();
 }
 
 bool WSClientUnsecureAsync::IsConnected() {
-    // TODO: This is a hack, check for both ws.is_open() and handshake done later on
-    //return this->ws.is_open();
-    return this->doneHandshake;
-
-    //// TODO: Test this
-    //if (this->doneHandshake) {
-    //    return true;
-    //}
-    //else {
-    //    return this->ws.is_open();
-    //}
+    if (this->connectDone && this->ws.is_open()) {
+        return true;
+    }
 }
 
 // Poll queue for messages
@@ -559,8 +547,12 @@ void WSClientSecureAsync::onHandshake(beast::error_code errorCode) {
         return;
     }
 
+    // Notify websocket is connected
+    this->connectDone = true;
+    this->connectCv.notify_all();
+
+
     // Add code here for post connection setup, if any
-    this->doneHandshake = true;
     this->doRead();
 }
 
@@ -635,8 +627,6 @@ void WSClientSecureAsync::doRead() {
     if (!readPending) {
         // Read to buffer
         this->ws.async_read(this->buffer, beast::bind_front_handler(&WSClientSecureAsync::onRead, shared_from_this()));
-        //this->ws.async_read_some(net::buffer(this->bufArr, 1024), beast::bind_front_handler(&WSClientUnsecureAsync::onRead, shared_from_this()));
-
         readPending = true;
     }
 }
@@ -665,8 +655,6 @@ void WSClientSecureAsync::onRead(beast::error_code errorCode, std::size_t bytesR
     std::cout << "INFO: onRead(), got message - " << WSCommon::HexStringToString(bufferString) << std::endl;
     this->messageQueue.push(bufferString);
     this->buffer.consume(bytesRead);
-    
-    //this->messageQueue.push(std::string((char*)this->bufArr, bytesRead));
 
     // Free queue lock
     this->messageQueueMtx.unlock();
@@ -699,25 +687,15 @@ void WSClientSecureAsync::onClose(beast::error_code errorCode) {
         return;
     }
 
-    this->doneHandshake = false;        // Reset handshake state
-
     // Free close operation lock
     this->closeDone = true;
     this->closeCv.notify_all();
 }
 
 bool WSClientSecureAsync::IsConnected() {
-    // TODO: This is a hack, check for both ws.is_open() and handshake done later on
-    //return this->ws.is_open();
-    return this->doneHandshake;
-
-    //// TODO: Test this
-    //if (this->doneHandshake) {
-    //    return true;
-    //}
-    //else {
-    //    return this->ws.is_open();
-    //}
+    if (this->connectDone && this->ws.is_open()) {
+        return true;
+    }
 }
 
 // Poll queue for messages
@@ -786,12 +764,19 @@ bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
     // Load ceritifcate into context
     this->ctx.load_verify_file("./cert.pem");
 
+    // Wrap async WSClient
+    this->async_ws = std::make_shared<WSClientSecureAsync>(this->ioc, this->ctx);
+
+    // Setup conditional variables to stall for connection
+    this->async_ws->connectDone = false;
+    std::unique_lock<std::mutex> lck(this->async_ws->connectMtx);
+
     try {
         for (int offset = 0; offset < IOC_THREADS; offset++) {
             this->threads.emplace_back([&] {
                 try {
                     // Start connection
-                    this->async_ws = std::make_shared<WSClientSecureAsync>(this->ioc, this->ctx);
+                    // this->async_ws = std::make_shared<WSClientSecureAsync>(this->ioc, this->ctx);
                     this->async_ws->run(uri);
                     std::cout << "Error: this->async_ws->run() ENDED, not supposed to end\n";
                 }
@@ -800,13 +785,8 @@ bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
                 }});
         }
 
-        // DEBUG - stall until connected
-        // TODO - replace this with conditional variable
-        while (this->async_ws == NULL) {
-            continue;
-        }
-        while (!this->async_ws->IsConnected()) {
-            continue;
+        while (!this->async_ws->connectDone) {
+            this->async_ws->connectCv.wait(lck);
         }
     }
     catch (std::exception const& e) {
@@ -824,12 +804,6 @@ void WSClientSecure::Disconnect() {
 size_t WSClientSecure::SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode) {
     if (this->async_ws == NULL) {
         return 0; // Not connected
-    }
-
-    // Stall for handshake
-        // TODO - replace this with conditional variable
-    while (!this->async_ws->IsConnected()) {
-        continue;
     }
 
     try {
