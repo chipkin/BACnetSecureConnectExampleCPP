@@ -62,7 +62,7 @@ class WSClientUnsecureAsync : public std::enable_shared_from_this<WSClientUnsecu
     websocket::stream<beast::tcp_stream> ws;
     std::string host;
     std::string port;
-    uint8_t* errorCode;
+    uint8_t errorCode;
     bool doneHandshake;
 
     // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
@@ -104,13 +104,14 @@ public:
     explicit WSClientUnsecureAsync(net::io_context& ioc)
         : resolver(net::make_strand(ioc))
         , ws(net::make_strand(ioc)) {
+        this->errorCode = 0;
         this->ioc = &ioc;
         this->doneHandshake = false;
         this->readPending = false;
     }
 
     // Async functions
-    void run(const WSURI uri, uint8_t* errorCode);
+    void run(const WSURI uri);
     void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
     void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
     void onHandshake(beast::error_code errorCode);
@@ -124,6 +125,7 @@ public:
     // Getters
     size_t getBytesWritten();
     size_t pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode);
+    uint8_t getAndResetErrorCode();
 
     // Status
     bool IsConnected();
@@ -161,7 +163,7 @@ class WSClientSecureAsync : public std::enable_shared_from_this<WSClientSecureAs
     websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws;
     std::string host;
     std::string port;
-    uint8_t* errorCode;
+    uint8_t errorCode;
     bool doneHandshake;
 
     // NOTE: io_context will use one thread to handle the websocket, 24/7. ioc->run() will block until websocket is closed.
@@ -204,6 +206,7 @@ public:
     explicit WSClientSecureAsync(net::io_context& ioc, ssl::context& ctx)
         : resolver(net::make_strand(ioc))
         , ws(net::make_strand(ioc), ctx) {
+        this->errorCode = 0;
         this->ioc = &ioc;
         this->ctx = &ctx;
         this->doneHandshake = false;
@@ -211,7 +214,7 @@ public:
     }
 
     // Async functions
-    void run(const WSURI uri, uint8_t* errorCode);
+    void run(const WSURI uri);
     void onResolve(beast::error_code errorCode, tcp::resolver::results_type results);
     void onConnect(beast::error_code errorCode, tcp::resolver::results_type::endpoint_type endpoint);
     void onSslHandshake(beast::error_code errorCode);
@@ -226,6 +229,7 @@ public:
     // Getters
     size_t getBytesWritten();
     size_t pollQueue(uint8_t* message, uint16_t maxMessageLength, uint8_t* errorCode);
+    uint8_t getAndResetErrorCode();
 
     // Status
     bool IsConnected();

@@ -15,9 +15,6 @@
     <Filter Include="CASBACnetStack\Enumerated">
       <UniqueIdentifier>{9f4516db-f97e-4bd9-94bb-cdbb974edf22}</UniqueIdentifier>
     </Filter>
-    <Filter Include="CASBACnetStack\Bitstrings">
-      <UniqueIdentifier>{23222e73-60a9-4fe6-8a62-370139a5ec38}</UniqueIdentifier>
-    </Filter>
     <Filter Include="CASBACnetStack\APDU">
       <UniqueIdentifier>{8b92a5c6-b106-49a7-be98-7a333b7dbb25}</UniqueIdentifier>
     </Filter>
@@ -96,6 +93,9 @@
     <Filter Include="Source Files">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="CASBACnetStack\BACnetSC\Bitstrings">
+      <UniqueIdentifier>{23222e73-60a9-4fe6-8a62-370139a5ec38}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -1271,9 +1271,6 @@
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackCommon.h">
       <Filter>CASBACnetStack</Filter>
     </ClInclude>
-    <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetBusinessLogic.h">
-      <Filter>CASBACnetStack</Filter>
-    </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetCallbackInterface.h">
       <Filter>CASBACnetStack</Filter>
     </ClInclude>
@@ -1563,25 +1560,25 @@
       <Filter>CASBACnetStack\Enumerated</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetDaysOfWeek.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetEventTransitionBits.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetLimitEnable.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetLogStatus.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetResultFlags.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetServicesSupported.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStatusFlags.h">
-      <Filter>CASBACnetStack\Bitstrings</Filter>
+      <Filter>CASBACnetStack\BACnetSC\Bitstrings</Filter>
     </ClInclude>
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetObjectBase.h">
       <Filter>CASBACnetStack\APDU</Filter>
@@ -2479,6 +2476,9 @@
     </ClInclude>
     <ClInclude Include="CIBuildSettings.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetBusinessLogic.h">
+      <Filter>CASBACnetStack\Processors</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

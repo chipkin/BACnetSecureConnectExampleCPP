@@ -79,8 +79,8 @@ const uint32_t MAX_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 WSNetworkLayer g_ws_network;
 
-const std::string primaryHubUri = "ws://localhost:4443/";
-const std::string failoverHubUri = "ws://localhost:4444/";
+const std::string primaryHubUri = "wss://localhost:4443/";
+const std::string failoverHubUri = "wss://localhost:4444/";
 
 // Callback Functions to Register to the DLL
 // ===========================================================================

@@ -98,7 +98,7 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
                 try {
                     // Start connection
                     this->async_ws = std::make_shared<WSClientUnsecureAsync>(this->ioc);
-                    this->async_ws->run(uri, errorCode);
+                    this->async_ws->run(uri);
                     std::cout << "Error: this->async_ws->run() ENDED, not supposed to end\n";
                 }
                 catch (std::exception& e) {
@@ -111,12 +111,19 @@ bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
         while (this->async_ws == NULL) {
             continue;
         }
+        while (!this->async_ws->IsConnected()) {
+            continue;
+        }
     }
     catch (std::exception const& e) {
         // NOTE: Error code set in async for now, may produce bad errors
         std::cout << e.what() << std::endl;
         return false;
     }
+
+    // Check for errors
+    *errorCode = this->async_ws->getAndResetErrorCode();
+
     return true;
 }
 void WSClientUnsecure::Disconnect() {
@@ -136,6 +143,7 @@ size_t WSClientUnsecure::SendWSMessage(const uint8_t *message, const uint16_t me
 
     try {
         this->async_ws->doWrite(message, messageLength);
+        *errorCode = this->async_ws->getAndResetErrorCode();
         return this->async_ws->getBytesWritten();
     }
     catch (std::exception const& e) {
@@ -151,14 +159,16 @@ size_t WSClientUnsecure::RecvWSMessage(uint8_t *message, uint16_t maxMessageLeng
         return 0; // Not connected
     }
 
-    return this->async_ws->pollQueue(message, maxMessageLength, errorCode);
+    size_t bytesRead = this->async_ws->pollQueue(message, maxMessageLength, errorCode);
+    *errorCode = this->async_ws->getAndResetErrorCode();
+    return bytesRead;
 }
 
 //
 // WSClientUnsecureAsync
 // ----------------------------------------------------------------------------
 // Start asynchronous connection
-void WSClientUnsecureAsync::run(const WSURI uri, uint8_t *errorCode) {
+void WSClientUnsecureAsync::run(const WSURI uri) {
     std::cout << "in WSClientUnsecureAsync::run()" << std::endl;
 
     Uri uriSplit = Uri::Parse(uri);
@@ -168,7 +178,6 @@ void WSClientUnsecureAsync::run(const WSURI uri, uint8_t *errorCode) {
 
     this->host = uriSplit.Host;
     this->port = uriSplit.Port;
-    this->errorCode = errorCode;
 
     resolver.async_resolve(this->host, this->port, beast::bind_front_handler(&WSClientUnsecureAsync::onResolve, shared_from_this()));
    
@@ -180,7 +189,7 @@ void WSClientUnsecureAsync::onResolve(beast::error_code errorCode, tcp::resolver
     std::cout << "in WSClientUnsecureAsync::onResolve()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_DNS_NAME_RESOLUTION_FAILED;
+        this->errorCode = ERROR_DNS_NAME_RESOLUTION_FAILED;
     }
 
     // Set timeout
@@ -195,7 +204,7 @@ void WSClientUnsecureAsync::onConnect(beast::error_code errorCode, tcp::resolver
     std::cout << "in WSClientUnsecureAsync::onConnect()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_CONNECTION_REFUSED;
+        this->errorCode = ERROR_TCP_CONNECTION_REFUSED;
     }
 
     // Turn off timeout because websocket stream has it own timeout system
@@ -229,7 +238,7 @@ void WSClientUnsecureAsync::onHandshake(beast::error_code errorCode) {
     std::cout << "in WSClientUnsecureAsync::onHandShake()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_CONNECTION_REFUSED;    // Set to ERROR_TLS_SERVER_CERTIFICATE_ERROR for Secure Connect
+        this->errorCode = ERROR_TCP_CONNECTION_REFUSED;    // Set to ERROR_TLS_SERVER_CERTIFICATE_ERROR for Secure Connect
     }
 
     // Add code here for post connection setup, if any
@@ -260,7 +269,7 @@ void WSClientUnsecureAsync::onWrite(beast::error_code errorCode, std::size_t byt
     std::cout << "in WSClientUnsecureAsync::onWrite()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_ERROR;
+        this->errorCode = ERROR_TCP_ERROR;
         return;
     }
 
@@ -318,7 +327,7 @@ void WSClientUnsecureAsync::doRead() {
 void WSClientUnsecureAsync::onRead(beast::error_code errorCode, std::size_t bytesRead) {
     std::cout << "in WSClientUnsecureAsync::onRead()\n";
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_ERROR;
+        this->errorCode = ERROR_TCP_ERROR;
         std::cout << "Error: WSClientUnsecureAsync::onRead() - " << errorCode << std::endl;
         return;
     }
@@ -367,7 +376,7 @@ void WSClientUnsecureAsync::onClose(beast::error_code errorCode) {
     std::cout << "in WSClientUnsecureAsync::onClose()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_ERROR;
+        this->errorCode = ERROR_TCP_ERROR;
     }
 
     this->doneHandshake = false;        // Reset handshake state
@@ -424,11 +433,17 @@ size_t WSClientUnsecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLen
     }
 }
 
+uint8_t WSClientUnsecureAsync::getAndResetErrorCode() {
+    uint8_t errorCode = this->errorCode;
+    this->errorCode = 0;
+    return errorCode;
+}
+
 //
 // WSClientSecureAsync
 // ----------------------------------------------------------------------------
 // Start asynchronous connection
-void WSClientSecureAsync::run(const WSURI uri, uint8_t *errorCode) {
+void WSClientSecureAsync::run(const WSURI uri) {
     std::cout << "in WSClientSecureAsync::run()" << std::endl;
 
     Uri uriSplit = Uri::Parse(uri);
@@ -438,7 +453,6 @@ void WSClientSecureAsync::run(const WSURI uri, uint8_t *errorCode) {
 
     this->host = uriSplit.Host;
     this->port = uriSplit.Port;
-    this->errorCode = errorCode;
 
     resolver.async_resolve(this->host, this->port, beast::bind_front_handler(&WSClientSecureAsync::onResolve, shared_from_this()));
    
@@ -450,7 +464,7 @@ void WSClientSecureAsync::onResolve(beast::error_code errorCode, tcp::resolver::
     std::cout << "in WSClientSecureAsync::onResolve()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_DNS_NAME_RESOLUTION_FAILED;
+        this->errorCode = ERROR_DNS_NAME_RESOLUTION_FAILED;
         std::cout << "OnResolve failed: ERROR_DNS_NAME_RESOLUTION_FAILED errorCode=" << errorCode << std::endl;
         return;
     }
@@ -467,7 +481,7 @@ void WSClientSecureAsync::onConnect(beast::error_code errorCode, tcp::resolver::
     std::cout << "in WSClientSecureAsync::onConnect()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_CONNECTION_REFUSED;
+        this->errorCode = ERROR_TCP_CONNECTION_REFUSED;
         std::cout << "OnConnect failed: ERROR_TCP_CONNECTION_REFUSED errorCode=" << errorCode << std::endl;
         return;
     }
@@ -480,7 +494,7 @@ void WSClientSecureAsync::onConnect(beast::error_code errorCode, tcp::resolver::
     {
         errorCode = beast::error_code(static_cast<int>(::ERR_get_error()),
             net::error::get_ssl_category());
-        *this->errorCode = ERROR_TLS_ERROR;
+        this->errorCode = ERROR_TLS_ERROR;
         std::cout << "OnConnect failed: SSL_set_tlsext_host_name errorCode=" << errorCode << std::endl;
         return;
     }
@@ -503,13 +517,16 @@ void WSClientSecureAsync::onSslHandshake(beast::error_code errorCode) {
 std::cout << "in WSClientSecureAsync::onSslHandshake()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TLS_SERVER_CERTIFICATE_ERROR;
+        this->errorCode = ERROR_TLS_SERVER_CERTIFICATE_ERROR;
         std::cout << "OnSslHandshake failed: ERROR_TLS_SERVER_CERTIFICATE_ERROR errorCode=" << errorCode << std::endl;
         return;
     }
 
     // Turn off timeout because websocket stream has it own timeout system
     beast::get_lowest_layer(this->ws).expires_never();
+
+    // Set suggested timeout settings for the websocket
+    this->ws.set_option(websocket::stream_base::timeout::suggested(beast::role_type::client));
 
     // Set default timeout settings for websocket
     websocket::stream_base::timeout timeoutOptions{
@@ -537,7 +554,7 @@ void WSClientSecureAsync::onHandshake(beast::error_code errorCode) {
     std::cout << "in WSClientSecureAsync::onHandShake()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_CONNECTION_REFUSED;    // Set to ERROR_TLS_SERVER_CERTIFICATE_ERROR for Secure Connect
+        this->errorCode = ERROR_TCP_CONNECTION_REFUSED;    // Set to ERROR_TLS_SERVER_CERTIFICATE_ERROR for Secure Connect
         std::cout << "OnHandshake failed: ERROR_TCP_CONNECTION_REFUSED errorCode=" << errorCode << std::endl;
         return;
     }
@@ -570,7 +587,7 @@ void WSClientSecureAsync::onWrite(beast::error_code errorCode, std::size_t bytes
     std::cout << "in WSClientSecureAsync::onWrite()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_ERROR;
+        this->errorCode = ERROR_TCP_ERROR;
         std::cout << "OnWrite failed: ERROR_TCP_ERROR errorCode=" << errorCode << std::endl;
         return;
     }
@@ -622,14 +639,13 @@ void WSClientSecureAsync::doRead() {
 
         readPending = true;
     }
-    
 }
 
 // Read operation done
 void WSClientSecureAsync::onRead(beast::error_code errorCode, std::size_t bytesRead) {
     std::cout << "in WSClientSecureAsync::onRead()\n";
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_ERROR;
+        this->errorCode = ERROR_TCP_ERROR;
         std::cout << "onRead failed: ERROR_TCP_ERROR errorCode=" << errorCode << std::endl;
         return;
     }
@@ -678,7 +694,7 @@ void WSClientSecureAsync::onClose(beast::error_code errorCode) {
     std::cout << "in WSClientSecureAsync::onClose()" << std::endl;
 
     if (errorCode) {
-        *this->errorCode = ERROR_TCP_ERROR;
+        this->errorCode = ERROR_TCP_ERROR;
         std::cout << "onClose failed: ERROR_TCP_ERROR errorCode=" << errorCode << std::endl;
         return;
     }
@@ -737,6 +753,12 @@ size_t WSClientSecureAsync::pollQueue(uint8_t* message, uint16_t maxMessageLengt
     }
 }
 
+uint8_t WSClientSecureAsync::getAndResetErrorCode() {
+    uint8_t errorCode = this->errorCode;
+    this->errorCode = 0;
+    return errorCode;
+}
+
 //
 // WSClientSecure
 // ----------------------------------------------------------------------------
@@ -761,13 +783,16 @@ bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
         this->async_ws->doClose();
     }
 
+    // Load ceritifcate into context
+    this->ctx.load_verify_file("./cert.pem");
+
     try {
         for (int offset = 0; offset < IOC_THREADS; offset++) {
             this->threads.emplace_back([&] {
                 try {
                     // Start connection
                     this->async_ws = std::make_shared<WSClientSecureAsync>(this->ioc, this->ctx);
-                    this->async_ws->run(uri, errorCode);
+                    this->async_ws->run(uri);
                     std::cout << "Error: this->async_ws->run() ENDED, not supposed to end\n";
                 }
                 catch (std::exception & e) {
@@ -780,12 +805,16 @@ bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
         while (this->async_ws == NULL) {
             continue;
         }
+        while (!this->async_ws->IsConnected()) {
+            continue;
+        }
     }
     catch (std::exception const& e) {
         // NOTE: Error code set in async for now, may produce bad errors
         std::cout << e.what() << std::endl;
         return false;
     }
+    *errorCode = this->async_ws->getAndResetErrorCode();
     return true;
 }
 void WSClientSecure::Disconnect() {
@@ -805,6 +834,7 @@ size_t WSClientSecure::SendWSMessage(const uint8_t *message, const uint16_t mess
 
     try {
         this->async_ws->doWrite(message, messageLength);
+        *errorCode = this->async_ws->getAndResetErrorCode();
         return this->async_ws->getBytesWritten();
     }
     catch (std::exception const& e) {
@@ -820,7 +850,9 @@ size_t WSClientSecure::RecvWSMessage(uint8_t *message, uint16_t maxMessageLength
         return 0; // Not connected
     }
 
-    return this->async_ws->pollQueue(message, maxMessageLength, errorCode);
+    size_t bytesRead = this->async_ws->pollQueue(message, maxMessageLength, errorCode);
+    *errorCode = this->async_ws->getAndResetErrorCode();
+    return bytesRead;
 }
 
 //

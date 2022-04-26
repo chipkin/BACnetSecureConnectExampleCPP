@@ -120,13 +120,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\boost_1_78_0;$(SolutionDir)..\submodules\openssl\include;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\xml2json\include;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;$(SolutionDir)..\bin\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\boost_1_78_0;$(SolutionDir)..\submodules\openssl\include;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\xml2json\include;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;$(SolutionDir)..\bin\;$(SolutionDir)..\submodules\openssl\include\openssl</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>X:\Work\Libraries\cpp\boost_1_78_0\stage\lib;C:\Program Files\OpenSSL\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\submodules\boost_1_78_0\lib;$(SolutionDir)..\submodules\openssl\lib;$(SolutionDir)..\submodules\openssl\bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>libcrypto.lib;libssl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
