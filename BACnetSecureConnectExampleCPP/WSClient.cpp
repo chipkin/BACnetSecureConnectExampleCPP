@@ -269,17 +269,19 @@ void WSClientUnsecureAsync::doWrite(const uint8_t* message, const uint16_t messa
 // Write operation done
 void WSClientUnsecureAsync::onWrite(beast::error_code errorCode, std::size_t bytesWritten) {
     std::cout << "in WSClientUnsecureAsync::onWrite()" << std::endl;
-
-    if (errorCode) {
-        this->errorCode = ERROR_TCP_ERROR;
-        return;
-    }
-
+    
     // Secure bytesWritten lock
     this->writeLenMtx.lock();
 
-    // Write value
-    this->bytesWritten = bytesWritten;
+    if (errorCode) {
+        this->errorCode = ERROR_TCP_ERROR;
+        std::cout << "OnWrite failed: ERROR_TCP_ERROR errorCode=" << errorCode << std::endl;
+        this->bytesWritten = 0;
+    }
+    else {
+        // Write value
+        this->bytesWritten = bytesWritten;
+    }
 
     // Free bytesWritten lock
     this->writeLenMtx.unlock();
@@ -578,17 +580,18 @@ void WSClientSecureAsync::doWrite(const uint8_t* message, const uint16_t message
 void WSClientSecureAsync::onWrite(beast::error_code errorCode, std::size_t bytesWritten) {
     std::cout << "in WSClientSecureAsync::onWrite()" << std::endl;
 
-    if (errorCode) {
-        this->errorCode = ERROR_TCP_ERROR;
-        std::cout << "OnWrite failed: ERROR_TCP_ERROR errorCode=" << errorCode << std::endl;
-        return;
-    }
-
     // Secure bytesWritten lock
     this->writeLenMtx.lock();
 
-    // Write value
-    this->bytesWritten = bytesWritten;
+    if (errorCode) {
+        this->errorCode = ERROR_TCP_ERROR;
+        std::cout << "OnWrite failed: ERROR_TCP_ERROR errorCode=" << errorCode << std::endl;
+        this->bytesWritten = 0;
+    }
+    else {
+        // Write value
+        this->bytesWritten = bytesWritten;
+    }
 
     // Free bytesWritten lock
     this->writeLenMtx.unlock();
@@ -776,7 +779,6 @@ bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
             this->threads.emplace_back([&] {
                 try {
                     // Start connection
-                    // this->async_ws = std::make_shared<WSClientSecureAsync>(this->ioc, this->ctx);
                     this->async_ws->run(uri);
                     std::cout << "Error: this->async_ws->run() ENDED, not supposed to end\n";
                 }
