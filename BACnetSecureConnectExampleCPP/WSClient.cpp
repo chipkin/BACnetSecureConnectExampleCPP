@@ -489,10 +489,40 @@ void WSClientSecureAsync::onConnect(beast::error_code errorCode, tcp::resolver::
         return;
     }
 
+    std::cout << "Host: " << this->host << ", Port: " << this->port << std::endl;
     // Update the host_ string. This will provide the value of the
     // Host HTTP header during the WebSocket handshake.
     // See https://tools.ietf.org/html/rfc7230#section-5.4
     this->host += ':' + std::to_string(endpoint.port());
+
+
+    //// TEST
+    //// Turn off timeout because websocket stream has it own timeout system
+    //beast::get_lowest_layer(this->ws).expires_never();
+
+    //// Set suggested timeout settings for the websocket
+    //this->ws.set_option(websocket::stream_base::timeout::suggested(beast::role_type::client));
+
+    //// Set default timeout settings for websocket
+    //websocket::stream_base::timeout timeoutOptions{
+    //    std::chrono::seconds(30),   // handshake timeout
+    //    websocket::stream_base::none(),   // idle timeout
+    //    false    // keep alive pings
+    //};
+
+    //// Set the timeout options on the stream.
+    //this->ws.set_option(timeoutOptions);
+
+    //// Set more options
+    //this->ws.set_option(websocket::stream_base::decorator(
+    //    [](websocket::request_type& req) {
+    //        req.set(http::field::sec_websocket_protocol,
+    //            "hub.bsc.bacnet.org");
+    //    }));
+
+    //// Start async handshake
+    //this->ws.async_handshake(host, "/", beast::bind_front_handler(&WSClientSecureAsync::onHandshake, shared_from_this()));
+
     
     // Perform the SSL handshake
     this->ws.next_layer().async_handshake(
@@ -536,7 +566,7 @@ std::cout << "in WSClientSecureAsync::onSslHandshake()" << std::endl;
         }));
 
     // Start async handshake
-    this->ws.async_handshake(host, "/", beast::bind_front_handler(&WSClientSecureAsync::onHandshake, shared_from_this()));
+    this->ws.async_handshake(this->host, "/", beast::bind_front_handler(&WSClientSecureAsync::onHandshake, shared_from_this()));
 
 }
 
@@ -764,8 +794,15 @@ bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
         this->async_ws->doClose();
     }
 
-    // Load ceritifcate into context
-    this->ctx.load_verify_file("./cert.pem");
+    // Load ceritifcate and private key into context
+    this->ctx.use_certificate_file("./cert.pem", ssl::context::pem);
+    this->ctx.use_private_key_file("./key.key", ssl::context::pem);
+
+    // Set context settings so that our SSL connection works
+    // https://stackoverflow.com/questions/43117638/boost-asio-get-with-client-certificate-sslv3-hand-shake-failed
+    this->ctx.set_options(boost::asio::ssl::context::default_workarounds |
+        boost::asio::ssl::context::no_sslv2 |
+        boost::asio::ssl::context::no_sslv3);
 
     // Wrap async WSClient
     this->async_ws = std::make_shared<WSClientSecureAsync>(this->ioc, this->ctx);
