@@ -86,7 +86,7 @@ bool WSClientUnsecure::IsConnected() {
     return false;
 }
 
-bool WSClientUnsecure::Connect(const WSURI uri, uint8_t *errorCode) {
+bool WSClientUnsecure::Connect(const WSURI uri, uint8_t* errorCode) {
     if (this->IsConnected()) {
         // We are connected, reconnect
         this->async_ws->doClose();
@@ -748,6 +748,14 @@ uint8_t WSClientSecureAsync::getAndResetErrorCode() {
 
 WSClientSecure::WSClientSecure() {
     this->async_ws = NULL;
+    this->m_cert = "";
+    this->m_key = "";
+}
+
+WSClientSecure::WSClientSecure(const std::string& certFilename, const std::string& keyFilename) {
+    this->async_ws = NULL;
+    this->m_cert = certFilename;
+    this->m_key = keyFilename;
 }
 
 bool WSClientSecure::IsConnected() {
@@ -758,15 +766,16 @@ bool WSClientSecure::IsConnected() {
     return false;
 }
 
-bool WSClientSecure::Connect(const WSURI uri, uint8_t *errorCode) {
+bool WSClientSecure::Connect(const WSURI uri, uint8_t* errorCode) {
+    // Check parameters,
     if (this->IsConnected()) {
         // We are connected, reconnect
         this->async_ws->doClose();
     }
 
     // Load ceritifcate and private key into context
-    this->ctx.use_certificate_file("./cert.pem", ssl::context::pem);
-    this->ctx.use_private_key_file("./key.key", ssl::context::pem);
+    this->ctx.use_certificate_file(this->m_cert, ssl::context::pem);
+    this->ctx.use_private_key_file(this->m_key, ssl::context::pem);
 
     // Set context settings so that our SSL connection works
     // https://stackoverflow.com/questions/43117638/boost-asio-get-with-client-certificate-sslv3-hand-shake-failed
@@ -861,7 +870,7 @@ bool WSNetworkLayer::IsConnected(const WSURI uri) {
     return ws->IsConnected();
 }
 
-bool WSNetworkLayer::AddConnection(const WSURI uri, uint8_t *errorCode) {
+bool WSNetworkLayer::AddConnection(const WSURI uri, uint8_t *errorCode, const std::string& certFilename = "", const std::string& keyFilename = "") {
     // Check to see if this connection exists
     WSClientBase *ws = GetWSClient(uri);
     if (ws != NULL) {
@@ -874,16 +883,27 @@ bool WSNetworkLayer::AddConnection(const WSURI uri, uint8_t *errorCode) {
     // Extract the parts from the uri
     Uri uriSplit = Uri::Parse(uri);
     if (uriSplit.Protocol.compare("ws") == 0) {
-        this->clients[uri] = new WSClientUnsecure();
+        WSClientUnsecure* unsecureClient = new(std::nothrow) WSClientUnsecure();
+        if (unsecureClient == NULL) {
+            std::cout << "Error: out of memory when creating unsecureClient" << std::endl;
+            return false;
+        }
+        this->clients[uri] = unsecureClient;
         return this->clients[uri]->Connect(uri, errorCode);
     } else if (uriSplit.Protocol.compare("wss") == 0) {
-        this->clients[uri] = new WSClientSecure();
+        WSClientSecure* secureClient = new (std::nothrow) WSClientSecure(certFilename, keyFilename);
+        if (secureClient == NULL) {
+            std::cout << "Error: out of memory when creating secureClient" << std::endl;
+            return false;
+        }
+        this->clients[uri] = secureClient;
         return this->clients[uri]->Connect(uri, errorCode);
     }
-
-    // Unknown
-    std::cout << "Error: Unknown protocol. Protocol=[" << uriSplit.Protocol << "]" << std::endl;
-    return false;
+    else {
+        // Unknown
+        std::cout << "Error: Unknown protocol. Protocol=[" << uriSplit.Protocol << "]" << std::endl;
+        return false;
+    }
 }
 void WSNetworkLayer::RemoveConnection(const WSURI uri) {
     // Check to see if this connection exists

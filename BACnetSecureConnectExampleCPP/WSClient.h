@@ -136,8 +136,6 @@ public:
 
     // Status
     bool IsConnected();
-
-
 };
 
 //
@@ -247,8 +245,6 @@ public:
 
     // Status
     bool IsConnected();
-
-
 };
 
 //
@@ -264,10 +260,14 @@ private:
 
     std::vector<std::thread> threads;   // Set IOC_THREADS to 1 for now
 
+    std::string m_cert;
+    std::string m_key;
+
 public:
     WSClientSecure();
+    WSClientSecure(const std::string& certFilename, const std::string& keyFilename);
     bool IsConnected();
-    bool Connect(const WSURI uri, uint8_t *errorCode);
+    bool Connect(const WSURI uri, uint8_t* errorCode);
     void Disconnect();
     size_t SendWSMessage(const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode);
     size_t RecvWSMessage(uint8_t *message, const uint16_t maxMessageLength, uint8_t *errorCode);
@@ -286,7 +286,7 @@ private:
     WSClientBase *GetWSClient(WSURI uri);
 
 public:
-    bool AddConnection(const WSURI uri, uint8_t *errorCode);
+    bool AddConnection(const WSURI uri, uint8_t *errorCode, const std::string& certFilename = "", const std::string& keyFilename = "");
     void RemoveConnection(const WSURI uri);
     bool IsConnected(const WSURI uri);
     size_t SendWSMessage(const WSURI uri, const uint8_t *message, const uint16_t messageLength, uint8_t *errorCode);

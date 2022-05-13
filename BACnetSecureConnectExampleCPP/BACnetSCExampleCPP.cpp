@@ -289,52 +289,6 @@ uint16_t CallbackReceiveMessage(uint8_t *message, const uint16_t maxMessageLengt
         return bytesRead;
     }
 
-    // TODO: Implement SC Receive Message
-
-    // OLD:
-    // char ipAddress[32];
-    // uint16_t port = 0;
-
-    // // Attempt to read bytes
-    // int bytesRead = g_udp.GetMessage(message, maxMessageLength, ipAddress, &port);
-    // if (bytesRead > 0) {
-    //     ChipkinCommon::CEndianness::ToBigEndian(&port, sizeof(uint16_t));
-    //     std::cout << std::endl
-    //               << "FYI: Received message from [" << ipAddress << ":" << port << "], length [" << bytesRead << "]" << std::endl;
-
-    //     // Convert the IP Address to the connection string
-    //     if (!ChipkinCommon::ChipkinConvert::IPAddressToBytes(ipAddress, receivedConnectionString, maxConnectionStringLength)) {
-    //         std::cerr << "Failed to convert the ip address into a connectionString" << std::endl;
-    //         return 0;
-    //     }
-    //     receivedConnectionString[4] = port / 256;
-    //     receivedConnectionString[5] = port % 256;
-
-    //     *receivedConnectionStringLength = 6;
-    //     *networkType = CASBACnetStackExampleConstants::NETWORK_TYPE_IP;
-
-    //     /*
-    //     // Process the message as XML
-    //     static char xmlRenderBuffer[MAX_RENDER_BUFFER_LENGTH ];
-    //     if (fpDecodeAsXML((char*)message, bytesRead, xmlRenderBuffer, MAX_RENDER_BUFFER_LENGTH ) > 0) {
-    //         std::cout << "---------------------" << std::endl;
-    //         std::cout << xmlRenderBuffer << std::endl;
-    //         std::cout << "---------------------" << std::endl;
-    //         memset(xmlRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH );
-    //     }
-    //     */
-
-    //     // Process the message as JSON
-    //     static char jsonRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
-    //     if (fpDecodeAsJSON((char *)message, bytesRead, jsonRenderBuffer, MAX_RENDER_BUFFER_LENGTH) > 0) {
-    //         std::cout << "---------------------" << std::endl;
-    //         std::cout << jsonRenderBuffer << std::endl;
-    //         std::cout << "---------------------" << std::endl;
-    //         memset(jsonRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
-    //     }
-    // }
-    //
-    // return bytesRead;
     return 0;
 }
 
@@ -374,62 +328,6 @@ uint16_t CallbackSendMessage(const uint8_t *message, const uint16_t messageLengt
     }
 
     // Otherwise, ignore
-    return 0;
-
-    // TODO: Implement SC Send Message
-
-    // OLD:
-    // // Verify Network Type
-    // if (networkType != CASBACnetStackExampleConstants::NETWORK_TYPE_IP) {
-    //     std::cout << "Message for different network" << std::endl;
-    //     return 0;
-    // }
-
-    // // Prepare the IP Address
-    // char ipAddress[32];
-    // if (broadcast) {
-    //     snprintf(ipAddress, 32, "%hhu.%hhu.%hhu.%hhu",
-    //              connectionString[0] | ~g_database.networkPort.IPSubnetMask[0],
-    //              connectionString[1] | ~g_database.networkPort.IPSubnetMask[1],
-    //              connectionString[2] | ~g_database.networkPort.IPSubnetMask[2],
-    //              connectionString[3] | ~g_database.networkPort.IPSubnetMask[3]);
-    // } else {
-    //     snprintf(ipAddress, 32, "%u.%u.%u.%u", connectionString[0], connectionString[1], connectionString[2], connectionString[3]);
-    // }
-
-    // // Get the port
-    // uint16_t port = 0;
-    // port += connectionString[4] * 256;
-    // port += connectionString[5];
-
-    // std::cout << std::endl
-    //           << "FYI: Sending message to [" << ipAddress << ":" << port << "] length [" << messageLength << "]" << std::endl;
-
-    // // Send the message
-    // if (!g_udp.SendMessage(ipAddress, port, (unsigned char *)message, messageLength)) {
-    //     std::cout << "Failed to send message" << std::endl;
-    //     return 0;
-    // }
-
-    // /*
-    // // Get the XML rendered version of the just sent message
-    // static char xmlRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
-    // if (fpDecodeAsXML((char*)message, messageLength, xmlRenderBuffer, MAX_RENDER_BUFFER_LENGTH) > 0) {
-    //     std::cout << xmlRenderBuffer << std::endl;
-    //     memset(xmlRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
-    // }
-    // */
-
-    // // Get the JSON rendered version of the just sent message
-    // static char jsonRenderBuffer[MAX_RENDER_BUFFER_LENGTH];
-    // if (fpDecodeAsJSON((char *)message, messageLength, jsonRenderBuffer, MAX_RENDER_BUFFER_LENGTH) > 0) {
-    //     std::cout << "---------------------" << std::endl;
-    //     std::cout << jsonRenderBuffer << std::endl;
-    //     std::cout << "---------------------" << std::endl;
-    //     memset(jsonRenderBuffer, 0, MAX_RENDER_BUFFER_LENGTH);
-    // }
-
-    // return messageLength;
     return 0;
 }
 
@@ -498,7 +396,7 @@ bool CallbackInitiateWebsocket(const char* websocketUri, const uint32_t websocke
     // Add connection to the network
 
     uint8_t errorCode = 0;
-    if (g_ws_network.AddConnection(uri, &errorCode)) {
+    if (g_ws_network.AddConnection(uri, &errorCode, "./cert.pem", "./key.key")) {
         std::cout << "Connected to uri=[" << uri << "]" << std::endl;
         fpSetBACnetSCWebSocketStatus(websocketUri, websocketUriLength, BACnetSCConstants::WebsocketStatus_Connected, 0);
         return true;
@@ -511,46 +409,14 @@ bool CallbackInitiateWebsocket(const char* websocketUri, const uint32_t websocke
 }
 
 void CallbackDisconnectWebsocket(const char* websocketUri, const uint32_t websocketUriLength) {
+    if (websocketUri == NULL || websocketUriLength == 0) {
+        // Nothing to do, no websocketUri provided
+        return;
+    }
+
+    WSURI uri = WSURI(websocketUri, websocketUriLength);
+
+    // Attempt to disconnect the socket
+    g_ws_network.RemoveConnection(uri);
     return;
 }
-
-// EXAMPLE: Send and receive with websockets
-// try {
-//     WSURI uri = "wss://localhost:8443/";
-//     // WSURI uri = "ws://localhost:8080/";
-//     WSNetworkLayer network;
-//     if (network.AddConnection(uri)) {
-//         std::cout << "Connected to uri=[" << uri << "]" << std::endl;
-
-//         std::string sentMessage = "testing";
-//         uint8_t errorCode;
-//         if (network.SendWSMessage(uri, (uint8_t *)sentMessage.c_str(), sentMessage.size(), &errorCode) > 0) {
-//             std::cout << "FYI: Message sent. Message=[" << sentMessage << "]" << std::endl;
-
-//             // This buffer will hold the incoming message
-//             uint8_t recvMessage[1024];
-
-//             // Loop while connected
-//             while (network.IsConnected(uri)) {
-//                 size_t len = network.RecvWSMessage(uri, recvMessage, 1024, &errorCode);
-//                 if (len > 0) {
-//                     recvMessage[len] = 0;
-//                     std::cout << recvMessage; //  << std::endl;
-//                 }
-//                 else {
-//                     std::cout << "No message received, errorCode: " << errorCode << std::endl;
-//                 }
-//             }
-//         } else {
-//             std::cout << "Error: Could not send message, errorCode: " << errorCode << std::endl;
-//         }
-
-//         std::cout << "FYI: Disconnect" << std::endl;
-//         network.RemoveConnection(uri);
-//     } else {
-//         std::cout << "Error: Could not connect" << std::endl;
-//     }
-// } catch (std::exception const &e) {
-//     std::cerr << "Error: " << e.what() << std::endl;
-//     return EXIT_FAILURE;
-// }
