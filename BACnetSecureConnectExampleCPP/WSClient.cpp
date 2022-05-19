@@ -388,6 +388,8 @@ bool WSClientUnsecureAsync::IsConnected() {
     if (this->connectDone && this->ws.is_open()) {
         return true;
     }
+
+    return false;
 }
 
 // Poll queue for messages
@@ -699,6 +701,8 @@ bool WSClientSecureAsync::IsConnected() {
     if (this->connectDone && this->ws.is_open()) {
         return true;
     }
+
+    return false;
 }
 
 // Poll queue for messages
@@ -870,7 +874,7 @@ bool WSNetworkLayer::IsConnected(const WSURI uri) {
     return ws->IsConnected();
 }
 
-bool WSNetworkLayer::AddConnection(const WSURI uri, uint8_t *errorCode, const std::string& certFilename = "", const std::string& keyFilename = "") {
+bool WSNetworkLayer::AddConnection(const WSURI uri, uint8_t *errorCode, const std::string& certFilename, const std::string& keyFilename) {
     // Check to see if this connection exists
     WSClientBase *ws = GetWSClient(uri);
     if (ws != NULL) {
