@@ -1,0 +1,3 @@
+[submodule "BACnetSecureConnectExampleCPP/submodules/cas-bacnet-stack"]
+	path = BACnetSecureConnectExampleCPP/submodules/cas-bacnet-stack
+	url = https://gitlab.com/chipkin/cas-bacnet-stack
