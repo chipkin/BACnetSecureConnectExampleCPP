@@ -4,6 +4,15 @@ A basic [BACnet Secure Connect](https://www.bacnetinternational.org/page/securec
 
 If you are looking for a free open source java implmeation of BACnet/SC I suggest looking at the [BACnet/SC Reference Stack](https://sourceforge.net/projects/bacnet-sc-reference-stack/)
 
+## User Input
+
+When the application is running and has successfully connected to a BACnet SC Hub users can use the following commands:
+
+- 'w' - Sends a Who-Is message.  All results can be viewed in the output log.
+- 'q' - Exits the application.
+
+More functionality will be added in the future.
+
 ## Releases
 
 Build versions of this example can be downloaded from the releases page:
@@ -24,6 +33,8 @@ npm run run
 NOTE:  
 To run the secure connection example, you have to generate your own certiifcate and private key pair, named `cert.pem` and `key.pem` and placed in `\BACnetSecureConnectExampleCPP\` and `\NodeTestWSSecureServer\`.   
 You must also update `\NodeTestWSSecureServer\app.js:5-7` accordingly.
+
+If testing with the BACnetSC Reference Stack, copy the cert and key for the example you are using to the main project directory
 
 ## Build
 
