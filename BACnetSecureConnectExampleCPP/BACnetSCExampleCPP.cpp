@@ -80,6 +80,7 @@ const uint32_t MAX_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 WSNetworkLayer g_ws_network;
 
+// ToDo: replace with the uri of the BACnet SC Hub device
 const std::string primaryHubUri = "wss://192.168.1.84:4443/";
 const std::string failoverHubUri = "wss://192.168.1.84:4444/";
 
@@ -109,7 +110,7 @@ bool DoUserInput();
 int main(int argc, char **argv) {
     // Print the application version information
     // ---------------------------------------------------------------------------
-    std::cout << "CAS BACnet Stack Server Example v" << APPLICATION_VERSION << std::endl;
+    std::cout << "BACnetSecureConnectExampleCPP v" << APPLICATION_VERSION << std::endl;
     std::cout << "https://github.com/chipkin/BACnetSecureConnectExampleCPP" << std::endl
               << std::endl;
 
@@ -167,6 +168,7 @@ int main(int argc, char **argv) {
 
     // Setup BACnet SC
     // ---------------------------------------------------------------------------
+    // Configuration of the UUID is a local matter
     const uint8_t uuid[BACnetSCConstants::BACNET_SC_DEVICE_UUID_LENGTH] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
     std::cout << "Setting BACnetSC UUID... ";
     if (!fpSetBACnetSCUuid(uuid, BACnetSCConstants::BACNET_SC_DEVICE_UUID_LENGTH)) {
@@ -176,6 +178,7 @@ int main(int argc, char **argv) {
     std::cout << "OK" << std::endl;
 
     std::cout << "Setting up HubConnector... " << std::endl;
+    // BACnet SC VMAC for this device is a local matter, must be unique on the BACnet SC network.
     const uint8_t vmac[BACnetSCConstants::BACNET_SC_VMAC_LENGTH] = { 0x09, 0x09, 0x09, 0x09 , 0x09 , 0x09 };
     std::cout << "  Connecting To primaryUri: " << primaryHubUri << std::endl;
     std::cout << "  Connecting To failoverUri: " << failoverHubUri << std::endl;
@@ -240,7 +243,7 @@ bool DoUserInput() {
         // Print the Help
         std::cout << std::endl << std::endl;
         // Print the application version information 
-        std::cout << "CAS BACnet Stack Server Example v" << APPLICATION_VERSION << "." << CIBUILDNUMBER << std::endl;
+        std::cout << "BACnetSecureConnectExampleCPP v" << APPLICATION_VERSION << "." << CIBUILDNUMBER << std::endl;
         // Print the user actions
         std::cout << "=================================" << std::endl;
         std::cout << "User Actions:" << std::endl;
