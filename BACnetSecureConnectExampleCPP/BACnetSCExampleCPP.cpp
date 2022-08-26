@@ -16,7 +16,8 @@
 // BACnet Stack
 #include "CASBACnetStackAdapter.h"
 // !!!!!! This file is part of the CAS BACnet Stack. Please contact Chipkin for more information.
-// !!!!!! https://github.com/chipkin/BACnetServerExampleCPP/issues/8
+
+// Example constants and database
 #include "CASBACnetSCExampleConstants.h"
 #include "CASBACnetSCExampleDatabase.h"
 
@@ -79,8 +80,8 @@ const uint32_t MAX_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 WSNetworkLayer g_ws_network;
 
-const std::string primaryHubUri = "wss://localhost:4443/";
-const std::string failoverHubUri = "wss://localhost:4444/";
+const std::string primaryHubUri = "wss://192.168.1.84:4443/";
+const std::string failoverHubUri = "wss://192.168.1.84:4444/";
 
 // Callback Functions to Register to the DLL
 // ===========================================================================
@@ -178,7 +179,7 @@ int main(int argc, char **argv) {
     const uint8_t vmac[BACnetSCConstants::BACNET_SC_VMAC_LENGTH] = { 0x09, 0x09, 0x09, 0x09 , 0x09 , 0x09 };
     std::cout << "  Connecting To primaryUri: " << primaryHubUri << std::endl;
     std::cout << "  Connecting To failoverUri: " << failoverHubUri << std::endl;
-    if (!fpSetBACnetSCHubConnector(vmac, BACnetSCConstants::BACNET_SC_VMAC_LENGTH, primaryHubUri.c_str(), primaryHubUri.size(), failoverHubUri.c_str(), failoverHubUri.size())) {
+    if (!fpSetBACnetSCHubConnector(vmac, BACnetSCConstants::BACNET_SC_VMAC_LENGTH, primaryHubUri.c_str(), primaryHubUri.size(), NULL, 0)) {
         std::cerr << "Failed to set the hub connector settings" << std::endl;
         return -1;
     }
@@ -208,9 +209,7 @@ int main(int argc, char **argv) {
 // ===========================================================================
 
 // Handle User Input
-// Handle any user input.
 // Note: User input in this example is used for the following:
-//		i - increment the analog-input value. Used to test COV
 //		h - Display options
 //      w - send Who-is broadcast
 //		q - Quit
@@ -242,6 +241,11 @@ bool DoUserInput() {
         std::cout << std::endl << std::endl;
         // Print the application version information 
         std::cout << "CAS BACnet Stack Server Example v" << APPLICATION_VERSION << "." << CIBUILDNUMBER << std::endl;
+        // Print the user actions
+        std::cout << "=================================" << std::endl;
+        std::cout << "User Actions:" << std::endl;
+        std::cout << "\tw - Send Who-is" << std::endl;
+        std::cout << "\tq - Exit Application" << std::endl;
         break;
     }
     }

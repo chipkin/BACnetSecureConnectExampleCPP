@@ -120,13 +120,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\boost_1_78_0;$(SolutionDir)..\submodules\openssl\include;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\xml2json\include;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;$(SolutionDir)..\bin\;$(SolutionDir)..\submodules\openssl\include\openssl</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>X:\Work\Libraries\cpp\boost_1_78_0;C:\Program Files\OpenSSL\include;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\xml2json\include;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;$(SolutionDir)..\bin\;$(SolutionDir)..\submodules\openssl\include\openssl</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\submodules\boost_1_78_0\lib;$(SolutionDir)..\submodules\openssl\lib;$(SolutionDir)..\submodules\openssl\bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>X:\Work\Libraries\cpp\boost_1_78_0\libs;C:\Program Files\OpenSSL\lib;$(SolutionDir)..\submodules\openssl\bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>libcrypto.lib;libssl.lib;ws2_32.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -464,6 +464,7 @@
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackDebug.cpp" />
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackEventNotificationParameters.cpp" />
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackInvokeIds.cpp" />
+    <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackMemoryBuffer.cpp" />
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackMessageGenerator.cpp" />
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackNetworkKey.cpp" />
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\BACnetStackNetworkPortBase.cpp" />
@@ -835,7 +836,6 @@
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCHeartbeatACK.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCHeartbeatRequest.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCHubConnector.h" />
-    <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCNetworkParameters.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCPacket.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCProprietaryMessage.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetSCWebsocket.h" />
@@ -864,6 +864,7 @@
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackEventNotificationParameters.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackInvokeIds.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackListItems.h" />
+    <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackMemoryBuffer.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackMessageGenerator.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackNetworkKey.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\BACnetStackNetworkPortBase.h" />
@@ -942,8 +943,11 @@
     <ClInclude Include="CASBACnetSCExampleConstants.h" />
     <ClInclude Include="CASBACnetSCExampleDatabase.h" />
     <ClInclude Include="CIBuildSettings.h" />
-    <ClInclude Include="submodules\cas-bacnet-stack\source\BACnetSCConnection.h" />
     <ClInclude Include="WSClient.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\CHANGELOG.md" />
+    <None Include="..\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
